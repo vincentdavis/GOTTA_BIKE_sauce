@@ -109,9 +109,6 @@ export async function main() {
     // Setup dialog event listeners
     setupDialog();
 
-    // Setup filter bar checkboxes
-    setupMainWindowFilters();
-
     // Subscribe to nearby data (same as nearby athletes window)
     common.subscribe('nearby', data => {
         if (!data || !data.length) return;
@@ -128,7 +125,6 @@ export async function main() {
         if (changed.has('backgroundOption') || changed.has('customBackgroundColor')) {
             applyBackground();
         }
-        syncFilterCheckboxes();
         renderRiders();
     });
 
@@ -395,40 +391,6 @@ function showMaxHRDialog(athleteId, name, currentMaxHR) {
     dialog.hidden = false;
     hrInput.focus();
     hrInput.select();
-}
-
-function setupMainWindowFilters() {
-    const filterCheckboxes = document.querySelectorAll('.filter-bar input[type="checkbox"]');
-
-    filterCheckboxes.forEach(checkbox => {
-        const settingKey = checkbox.dataset.setting;
-
-        // Sync initial state from settings (filterShowAll defaults to true)
-        const value = common.settingsStore.get(settingKey);
-        if (settingKey === 'filterShowAll') {
-            checkbox.checked = value !== false; // Default to checked if undefined
-        } else {
-            checkbox.checked = !!value;
-        }
-
-        // Update settings on change
-        checkbox.addEventListener('change', () => {
-            common.settingsStore.set(settingKey, checkbox.checked);
-        });
-    });
-}
-
-function syncFilterCheckboxes() {
-    const filterCheckboxes = document.querySelectorAll('.filter-bar input[type="checkbox"]');
-    filterCheckboxes.forEach(checkbox => {
-        const settingKey = checkbox.dataset.setting;
-        const value = common.settingsStore.get(settingKey);
-        if (settingKey === 'filterShowAll') {
-            checkbox.checked = value !== false;
-        } else {
-            checkbox.checked = !!value;
-        }
-    });
 }
 
 function renderRiders() {
