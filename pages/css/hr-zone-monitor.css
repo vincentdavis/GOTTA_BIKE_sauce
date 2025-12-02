@@ -1,0 +1,559 @@
+/* HR Zone Monitor Styles */
+
+/* Main display styles */
+html.solid-background {
+    background: var(--background-color);
+}
+html.solid-background body {
+    background: transparent !important;
+}
+
+#content {
+    scroll-behavior: smooth;
+    padding: 5px 10px;
+    overflow: auto;
+    position: relative;
+    font-variant: tabular-nums;
+    font-size: calc(var(--font-scale, 1) * 0.9em);
+}
+
+#content table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+#content thead th {
+    text-align: left;
+    padding: 4px 8px;
+    border-bottom: 1px solid #444;
+    font-size: 0.85em;
+    color: #999;
+}
+
+#content thead th:nth-child(2),
+#content thead th:nth-child(3),
+#content thead th:nth-child(4) {
+    text-align: center;
+    width: 50px;
+}
+
+#content tbody tr {
+    border-bottom: 1px solid #333;
+    transition: background-color 0.2s ease;
+}
+
+#content tbody tr:hover {
+    background-color: rgba(255, 255, 255, 0.1);
+}
+
+#content tbody tr.watching {
+    background-color: rgba(33, 150, 243, 0.25);
+}
+
+#content tbody tr.watching:hover {
+    background-color: rgba(33, 150, 243, 0.35);
+}
+
+.name-cell {
+    padding: 6px 8px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 150px;
+}
+
+.hr-cell {
+    padding: 4px 10px;
+    text-align: center;
+    font-weight: bold;
+    border-radius: 4px;
+    min-width: 50px;
+    transition: background-color 0.3s ease;
+}
+
+.hr-cell.no-max-hr {
+    opacity: 0.7;
+}
+
+.power-cell {
+    padding: 4px 8px;
+    text-align: center;
+    font-weight: bold;
+    border-radius: 4px;
+    min-width: 40px;
+    transition: background-color 0.3s ease;
+}
+
+/* Dialog overlay styles */
+.dialog-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.7);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+}
+
+.dialog-overlay[hidden] {
+    display: none;
+}
+
+.dialog-content {
+    background: #2a2a2a;
+    border-radius: 8px;
+    padding: 20px;
+    min-width: 250px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+}
+
+.dialog-title {
+    font-size: 1.2em;
+    font-weight: bold;
+    margin-bottom: 10px;
+    color: #fff;
+}
+
+.dialog-rider-name {
+    color: #aaa;
+    margin-bottom: 15px;
+    font-size: 0.9em;
+}
+
+.dialog-content input[type="number"] {
+    width: 100%;
+    padding: 10px;
+    font-size: 1.1em;
+    border: 1px solid #444;
+    border-radius: 4px;
+    background: #333;
+    color: #fff;
+    margin-bottom: 15px;
+    box-sizing: border-box;
+}
+
+.dialog-content input[type="number"]:focus {
+    outline: none;
+    border-color: #2196F3;
+}
+
+.dialog-buttons {
+    display: flex;
+    gap: 10px;
+    justify-content: flex-end;
+}
+
+.dialog-buttons button {
+    padding: 8px 16px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.9em;
+}
+
+#dialog-cancel {
+    background: #555;
+    color: #fff;
+}
+
+#dialog-cancel:hover {
+    background: #666;
+}
+
+#dialog-save {
+    background: #4CAF50;
+    color: #fff;
+}
+
+#dialog-save:hover {
+    background: #45a049;
+}
+
+/* Settings page styles */
+.settings-page #settings {
+    padding: 15px;
+}
+
+.section {
+    margin-bottom: 20px;
+    padding-bottom: 15px;
+    border-bottom: 1px solid #333;
+}
+
+.section:last-child {
+    border-bottom: none;
+}
+
+.section > .title {
+    font-size: 1.1em;
+    font-weight: bold;
+    margin-bottom: 12px;
+    color: #fff;
+}
+
+/* Zone legend */
+.zone-legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin: 10px 0;
+}
+
+.zone-legend .zone {
+    padding: 6px 12px;
+    border-radius: 4px;
+    font-size: 0.85em;
+    color: white;
+}
+
+/* Rider configuration list */
+#rider-list {
+    max-height: 300px;
+    overflow-y: auto;
+    margin-bottom: 15px;
+}
+
+.rider-config-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px;
+    border-bottom: 1px solid #333;
+}
+
+.rider-config-row:hover {
+    background-color: rgba(255, 255, 255, 0.05);
+}
+
+.rider-name {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.rider-id {
+    color: #888;
+    font-size: 0.85em;
+    flex-shrink: 0;
+}
+
+.max-hr-input {
+    width: 70px;
+    text-align: center;
+    padding: 4px 8px;
+    border: 1px solid #444;
+    border-radius: 4px;
+    background: #333;
+    color: #fff;
+}
+
+.delete-btn {
+    background: #f44336;
+    border: none;
+    color: white;
+    padding: 4px 8px;
+    border-radius: 4px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.delete-btn:hover {
+    background: #d32f2f;
+}
+
+.delete-btn ms {
+    font-size: 1.2em;
+}
+
+/* Add rider form */
+.add-rider-form {
+    display: flex;
+    gap: 8px;
+    margin-top: 15px;
+    padding: 12px;
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 4px;
+    flex-wrap: wrap;
+}
+
+.add-rider-form input {
+    flex: 1;
+    min-width: 80px;
+    padding: 8px;
+    border: 1px solid #444;
+    border-radius: 4px;
+    background: #333;
+    color: #fff;
+}
+
+.add-rider-form input::placeholder {
+    color: #777;
+}
+
+.add-rider-form button {
+    background: #4CAF50;
+    border: none;
+    color: white;
+    padding: 8px 16px;
+    border-radius: 4px;
+    cursor: pointer;
+    flex-shrink: 0;
+}
+
+.add-rider-form button:hover {
+    background: #45a049;
+}
+
+.no-riders {
+    padding: 20px;
+    text-align: center;
+    color: #888;
+    font-style: italic;
+}
+
+/* Main window filter bar */
+.filter-bar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5em;
+    padding: 0.4em 0.6em;
+    font-size: 0.85em;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.15);
+    background: rgba(0, 0, 0, 0.2);
+}
+
+.filter-bar label {
+    display: flex;
+    align-items: center;
+    gap: 0.25em;
+    cursor: pointer;
+    opacity: 0.6;
+    transition: opacity 0.2s ease;
+    padding: 0.2em 0.4em;
+    border-radius: 3px;
+}
+
+.filter-bar label:hover {
+    opacity: 0.9;
+    background: rgba(255, 255, 255, 0.1);
+}
+
+.filter-bar label:has(input:checked) {
+    opacity: 1;
+    font-weight: bold;
+    background: rgba(33, 150, 243, 0.2);
+}
+
+.filter-bar input[type="checkbox"] {
+    margin: 0;
+    cursor: pointer;
+}
+
+/* Settings page filter section */
+.filter-checkbox {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 0;
+}
+
+.filter-checkbox input[type="checkbox"] {
+    cursor: pointer;
+}
+
+.filter-checkbox key {
+    cursor: pointer;
+}
+
+.hint {
+    color: #888;
+    font-size: 0.85em;
+    margin-bottom: 10px;
+}
+
+.team-filter-input {
+    margin-left: 24px;
+    margin-top: 4px;
+}
+
+.team-filter-input input {
+    width: 100%;
+    max-width: 250px;
+    padding: 8px;
+    border: 1px solid #444;
+    border-radius: 4px;
+    background: #333;
+    color: #fff;
+}
+
+.team-filter-input input::placeholder {
+    color: #777;
+}
+
+/* Custom color picker row - initially hidden, shown via JS */
+.custom-color-row {
+    display: none;
+    margin-left: 20px;
+}
+
+.custom-color-row.visible {
+    display: flex;
+}
+
+.custom-color-row input[type="color"] {
+    width: 60px;
+    height: 30px;
+    border: 1px solid #444;
+    border-radius: 4px;
+    cursor: pointer;
+    padding: 2px;
+    background: #333;
+}
+
+/* Power column options - horizontal layout */
+.power-column-options {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+}
+
+.power-column-options .filter-checkbox {
+    padding: 4px 0;
+}
+
+/* Unified athlete max values table styles */
+.athlete-max-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px;
+    border-bottom: 1px solid #333;
+}
+
+.athlete-max-row:hover {
+    background-color: rgba(255, 255, 255, 0.05);
+}
+
+.athlete-info {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+}
+
+.athlete-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.athlete-team,
+.athlete-meta {
+    font-size: 0.8em;
+    color: #888;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.max-value-input {
+    width: 55px;
+    text-align: center;
+    padding: 4px 6px;
+    border: 1px solid #444;
+    border-radius: 4px;
+    background: #333;
+    color: #fff;
+    font-size: 0.9em;
+}
+
+.max-value-input:focus {
+    outline: none;
+    border-color: #2196F3;
+}
+
+.max-value-input::placeholder {
+    color: #666;
+    font-size: 0.85em;
+}
+
+.power-inputs {
+    display: flex;
+    gap: 4px;
+}
+
+.power-inputs .power-input {
+    width: 45px;
+}
+
+/* Athlete search bar */
+.athlete-search-bar {
+    margin-bottom: 10px;
+}
+
+.athlete-search-bar input {
+    width: 100%;
+    padding: 8px 12px;
+    border: 1px solid #444;
+    border-radius: 4px;
+    background: #333;
+    color: #fff;
+    font-size: 0.9em;
+    box-sizing: border-box;
+}
+
+.athlete-search-bar input::placeholder {
+    color: #777;
+}
+
+.athlete-search-bar input:focus {
+    outline: none;
+    border-color: #2196F3;
+}
+
+/* Athlete list header */
+.athlete-max-header {
+    background: rgba(255, 255, 255, 0.05);
+    border-bottom: 2px solid #444;
+    font-weight: bold;
+    font-size: 0.85em;
+}
+
+.athlete-max-header:hover {
+    background: rgba(255, 255, 255, 0.05);
+}
+
+.header-label {
+    color: #999;
+    text-align: center;
+}
+
+.athlete-max-header .athlete-info .header-label {
+    text-align: left;
+}
+
+.hr-header {
+    width: 55px;
+    display: inline-block;
+}
+
+.header-power {
+    justify-content: center;
+}
+
+.header-power .header-label {
+    width: 45px;
+    display: inline-block;
+    text-align: center;
+}
+
+.delete-header {
+    width: 32px;
+}

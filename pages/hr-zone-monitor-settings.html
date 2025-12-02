@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html class="settings-page" tabindex="0" data-settings-key="hr-zone-monitor-settings-v1">
+    <head>
+        <meta charset="utf-8"/>
+        <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0"/>
+        <meta name="apple-mobile-web-app-capable" content="yes"/>
+        <meta http-equiv="Content-Security-Policy" content="script-src 'self' 'unsafe-inline';"/>
+
+        <title>GOTTA.BIKE sauce - Settings</title>
+
+        <link id="favicon" rel="shortcut icon" href="/pages/images/favicon.png"/>
+        <link rel="stylesheet" href="/pages/css/common.css"/>
+        <link rel="stylesheet" href="./css/hr-zone-monitor.css"/>
+
+        <script type="module">
+            import {settingsMain} from './src/hr-zone-monitor.mjs';
+            settingsMain();
+        </script>
+    </head>
+    <body>
+        <div id="titlebar">
+            <header>
+                <div class="logo"><img src="/pages/images/icon128.png"/></div>
+                <div class="title">GOTTA.BIKE sauce - Settings</div>
+                <div class="filler"></div>
+                <div class="buttons">
+                    <div title="Close this window" class="button close electron-only"><ms>close</ms></div>
+                </div>
+            </header>
+        </div>
+        <div id="settings">
+            <form id="options" class="section">
+                <div class="title">Display Settings</div>
+                <label>
+                    <key>Font scaling:</key>
+                    <input type="range" name="fontScale" min="0.5" max="3" step="0.1"/>
+                    <input type="number" name="fontScale" min="0.5" max="3" step="0.1" style="--size: 5"/>
+                </label>
+                <label>
+                    <key>Max riders to show:</key>
+                    <input type="number" name="maxRiders" min="5" max="50" step="1" style="--size: 5"/>
+                </label>
+                <label>
+                    <key>Background:</key>
+                    <select name="backgroundOption">
+                        <option value="transparent">Transparent</option>
+                        <option value="sauce">Sauce Default</option>
+                        <option value="black">Black</option>
+                        <option value="darkGray">Dark Gray</option>
+                        <option value="darkBlue">Dark Blue</option>
+                        <option value="darkGreen">Dark Green</option>
+                        <option value="custom">Custom Color</option>
+                    </select>
+                </label>
+                <label class="custom-color-row">
+                    <key>Custom color:</key>
+                    <input type="color" name="customBackgroundColor" value="#232323"/>
+                </label>
+                <label>
+                    <key>Max value mode:</key>
+                    <select name="maxValueMode">
+                        <option value="session">Session only (reset each ride)</option>
+                        <option value="stored">Stored (persist and auto-update)</option>
+                    </select>
+                </label>
+                <label>
+                    <key>Theme override:</key>
+                    <select is="sauce-theme" override></select>
+                </label>
+            </form>
+
+            <form id="power-columns" class="section">
+                <div class="title">Power Columns</div>
+                <p class="hint">Select which power duration columns to display</p>
+                <div class="power-column-options">
+                    <label class="filter-checkbox">
+                        <input type="checkbox" name="showPower5s">
+                        <key>5 sec</key>
+                    </label>
+                    <label class="filter-checkbox">
+                        <input type="checkbox" name="showPower15s">
+                        <key>15 sec</key>
+                    </label>
+                    <label class="filter-checkbox">
+                        <input type="checkbox" name="showPower60s">
+                        <key>1 min</key>
+                    </label>
+                    <label class="filter-checkbox">
+                        <input type="checkbox" name="showPower300s">
+                        <key>5 min</key>
+                    </label>
+                    <label class="filter-checkbox">
+                        <input type="checkbox" name="showPower1200s">
+                        <key>20 min</key>
+                    </label>
+                </div>
+            </form>
+
+            <form id="filter-options" class="section">
+                <div class="title">Rider Filters</div>
+                <p class="hint">Combine filters to include riders (OR logic)</p>
+                <label class="filter-checkbox">
+                    <input type="checkbox" name="filterShowAll">
+                    <key>Show All (disable filters)</key>
+                </label>
+                <label class="filter-checkbox">
+                    <input type="checkbox" name="filterOnlyWithHR">
+                    <key>Only with Heart Rate</key>
+                </label>
+                <label class="filter-checkbox">
+                    <input type="checkbox" name="filterInGroup">
+                    <key>In My Group</key>
+                </label>
+                <label class="filter-checkbox">
+                    <input type="checkbox" name="filterMarkedFollowing">
+                    <key>Marked / Following</key>
+                </label>
+                <label class="filter-checkbox">
+                    <input type="checkbox" name="filterSameEvent">
+                    <key>Same Event</key>
+                </label>
+                <label class="filter-checkbox">
+                    <input type="checkbox" name="filterByTeam">
+                    <key>By Team</key>
+                </label>
+                <div class="team-filter-input">
+                    <input type="text" name="filterTeamName" placeholder="Team name to filter">
+                </div>
+            </form>
+
+            <div class="section">
+                <div class="title">HR Zone Colors</div>
+                <div class="zone-legend">
+                    <div class="zone" style="background: #888888;">Gray: &lt;60%</div>
+                    <div class="zone" style="background: #2196F3;">Blue: 60-70%</div>
+                    <div class="zone" style="background: #4CAF50;">Green: 70-80%</div>
+                    <div class="zone" style="background: #FFEB3B; color: #000;">Yellow: 80-90%</div>
+                    <div class="zone" style="background: #F44336;">Red: 90%+</div>
+                </div>
+            </div>
+
+            <div class="section">
+                <div class="title">Power Zone Colors</div>
+                <div class="zone-legend">
+                    <div class="zone" style="background: #888888;">Gray: &lt;60%</div>
+                    <div class="zone" style="background: #2196F3;">Blue: 60-70%</div>
+                    <div class="zone" style="background: #4CAF50;">Green: 70-80%</div>
+                    <div class="zone" style="background: #FFEB3B; color: #000;">Yellow: 80-90%</div>
+                    <div class="zone" style="background: #F44336;">Red: 90%+</div>
+                </div>
+            </div>
+
+            <div class="section">
+                <div class="title">Stored Athlete Max Values</div>
+                <p style="color: #888; font-size: 0.85em; margin-bottom: 10px;">
+                    Max values are automatically tracked during rides. Click values to edit. Only used when mode is "Stored".
+                </p>
+                <div class="athlete-search-bar">
+                    <input type="text" id="athlete-search" placeholder="Search by name, team, or ID..."/>
+                </div>
+                <div id="athlete-max-list"></div>
+                <div class="add-rider-form">
+                    <input type="text" id="new-rider-name" placeholder="Name (optional)"/>
+                    <input type="number" id="new-rider-id" placeholder="Athlete ID" min="1"/>
+                    <input type="number" id="new-rider-maxhr" placeholder="Max HR" min="100" max="250"/>
+                    <button type="button" id="add-rider-btn">Add</button>
+                </div>
+            </div>
+        </div>
+    </body>
+</html>

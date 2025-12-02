@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html tabindex="0" data-settings-key="hr-zone-monitor-settings-v1">
+    <head>
+        <meta charset="utf-8"/>
+        <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0"/>
+        <meta name="apple-mobile-web-app-capable" content="yes"/>
+        <meta http-equiv="Content-Security-Policy" content="script-src 'self' 'unsafe-inline';"/>
+
+        <title>GOTTA.BIKE sauce</title>
+
+        <link id="favicon" rel="shortcut icon" href="/pages/images/favicon.png"/>
+        <link rel="stylesheet" href="/pages/css/common.css"/>
+        <link rel="stylesheet" href="/pages/css/nearby.css"/>
+        <link rel="stylesheet" href="./css/hr-zone-monitor.css"/>
+
+        <script type="module">
+            import {main} from './src/hr-zone-monitor.mjs';
+            main();
+        </script>
+    </head>
+    <body class="transparent-bg">
+        <div id="titlebar">
+            <header>
+                <div class="logo"><img src="/pages/images/icon128.png"/></div>
+                <div class="title">GOTTA.BIKE sauce</div>
+                <div class="filler"></div>
+                <div class="buttons">
+                    <a class="button open-settings" href="hr-zone-monitor-settings.html?width=500&height=600&child-window"
+                       title="Open settings window" target="hr-zone-monitor-settings"><ms>settings</ms></a>
+                    <div title="Close this window" class="button close electron-only"><ms>close</ms></div>
+                </div>
+            </header>
+        </div>
+        <div class="filter-bar">
+            <label><input type="checkbox" data-setting="filterShowAll"> All</label>
+            <label><input type="checkbox" data-setting="filterOnlyWithHR"> HR</label>
+            <label><input type="checkbox" data-setting="filterInGroup"> Group</label>
+            <label><input type="checkbox" data-setting="filterMarkedFollowing"> Marked</label>
+            <label><input type="checkbox" data-setting="filterSameEvent"> Event</label>
+        </div>
+        <div id="content">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Rider</th>
+                        <th>%HR</th>
+                        <th>15s</th>
+                        <th>1m</th>
+                    </tr>
+                </thead>
+                <tbody id="rider-table"></tbody>
+            </table>
+        </div>
+        <!-- Max HR input dialog -->
+        <div id="max-hr-dialog" class="dialog-overlay" hidden>
+            <div class="dialog-content">
+                <div class="dialog-title">Set Max HR</div>
+                <div class="dialog-rider-name"></div>
+                <input type="number" id="dialog-max-hr" min="100" max="250" placeholder="Max HR (e.g. 185)"/>
+                <div class="dialog-buttons">
+                    <button type="button" id="dialog-cancel">Cancel</button>
+                    <button type="button" id="dialog-save">Save</button>
+                </div>
+            </div>
+        </div>
+    </body>
+</html>

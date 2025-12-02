@@ -1,0 +1,27 @@
+{
+    "manifest_version": 1,
+    "name": "GOTTA.BIKE sauce",
+    "description": "Display nearby riders with heart rate color-coded by HR zone",
+    "author": "Vincent Davis",
+    "website_url": "https://gotta.bike",
+    "version": "1.5.0",
+    "content_js": [],
+    "content_css": [],
+    "web_root": "pages",
+    "windows": [
+        {
+            "file": "pages/hr-zone-monitor.html",
+            "id": "hr-zone-monitor",
+            "name": "GOTTA.BIKE sauce",
+            "description": "Shows nearby riders with HR zone color coding based on max HR",
+            "overlay": true,
+            "frame": false,
+            "default_bounds": {
+                "width": 250,
+                "height": 400,
+                "x": -300,
+                "y": 100
+            }
+        }
+    ]
+}
