@@ -48,7 +48,7 @@ common.settingsStore.setDefault({
     showDraftAvg: false,
     showDraftEnergy: false,
     // Team column setting
-    showTeamColumn: false,
+    showTeamColumn: true,
     // Filter settings (checkboxes - combinable with OR logic)
     filterShowAll: true,           // When true, ignores other filters
     filterOnlyWithHR: false,       // Only riders broadcasting HR
@@ -455,6 +455,17 @@ function renderRiders() {
         nameCell.textContent = truncateName(name, 15);
         nameCell.title = name;
 
+        // Team cell (if enabled)
+        let teamCell = null;
+        if (settings.showTeamColumn) {
+            const storedTeam = storedMaxHRData[`team_${athleteId}`];
+            const displayTeam = storedTeam || team;
+            teamCell = document.createElement('td');
+            teamCell.className = 'team-cell';
+            teamCell.textContent = truncateName(displayTeam, 10) || '-';
+            teamCell.title = displayTeam || 'No team';
+        }
+
         // HR cell with zone coloring - show % of max HR
         const hrCell = document.createElement('td');
         hrCell.className = 'hr-cell';
@@ -528,14 +539,25 @@ function renderRiders() {
             settings[`show${col.key.charAt(0).toUpperCase() + col.key.slice(1)}`]
         );
 
+        // Debug: log athlete structure to find draft data (only for first athlete, once)
+        if (enabledDraftColumns.length > 0 && riders.indexOf(athlete) === 0 && !window._draftDebugLogged) {
+            window._draftDebugLogged = true;
+            console.log('Athlete data structure:', athlete);
+            console.log('athlete.stats:', athlete.stats);
+            console.log('athlete.state:', athlete.state);
+        }
+
         // Create draft cells for enabled columns
         const draftCells = [];
         for (const col of enabledDraftColumns) {
             const draftCell = document.createElement('td');
             draftCell.className = 'draft-cell';
 
-            // Get draft value from athlete.stats.draft
-            let value = athlete.stats?.draft?.[col.field];
+            // Get draft value - try multiple locations
+            let value = athlete.stats?.draft?.[col.field]
+                ?? athlete.state?.draft?.[col.field]
+                ?? athlete.stats?.[col.field]
+                ?? athlete.state?.[col.field];
 
             if (value !== undefined && value !== null) {
                 if (col.unit === 'kJ') {
@@ -560,6 +582,9 @@ function renderRiders() {
         }
 
         row.appendChild(nameCell);
+        if (teamCell) {
+            row.appendChild(teamCell);
+        }
         row.appendChild(hrCell);
         for (const cell of powerCells) {
             row.appendChild(cell);
@@ -588,8 +613,16 @@ function updateTableHeaders(settings) {
         settings[`show${col.key.charAt(0).toUpperCase() + col.key.slice(1)}`]
     );
 
-    // Rebuild headers: Rider, %HR, power columns, draft columns
-    thead.innerHTML = '<th>Rider</th><th>%HR</th>';
+    // Rebuild headers: Rider, Team (if enabled), %HR, power columns, draft columns
+    thead.innerHTML = '<th>Rider</th>';
+    if (settings.showTeamColumn) {
+        const teamTh = document.createElement('th');
+        teamTh.textContent = 'Team';
+        thead.appendChild(teamTh);
+    }
+    const hrTh = document.createElement('th');
+    hrTh.textContent = '%HR';
+    thead.appendChild(hrTh);
     for (const col of enabledPowerColumns) {
         const th = document.createElement('th');
         th.textContent = col.label;
@@ -918,16 +951,12 @@ function renderEntrants(searchFilter = '') {
         });
     }
 
-    // Check if team column is enabled
-    const settings = common.settingsStore.get();
-    const showTeamColumn = settings.showTeamColumn;
-
-    // Add header row
+    // Add header row (team column always visible in event viewer)
     const headerRow = document.createElement('div');
     headerRow.className = 'athlete-max-row athlete-max-header';
     headerRow.innerHTML = `
         <div class="athlete-info"><span class="header-label">Athlete</span></div>
-        ${showTeamColumn ? '<span class="header-label team-header">Team</span>' : ''}
+        <span class="header-label team-header">Team</span>
         <span class="header-label hr-header">HR</span>
         <div class="power-inputs header-power">
             ${POWER_COLUMNS.map(col => `<span class="header-label">${col.label}</span>`).join('')}
@@ -979,34 +1008,31 @@ function renderEntrants(searchFilter = '') {
         metaSpan.textContent = metaParts.join(' · ');
         infoDiv.appendChild(metaSpan);
 
-        // Team input (if enabled)
-        let teamInput = null;
-        if (showTeamColumn) {
-            teamInput = document.createElement('input');
-            teamInput.type = 'text';
-            teamInput.className = 'team-input';
-            teamInput.value = storedTeam || team;
-            teamInput.placeholder = 'Team';
-            teamInput.title = 'Team name';
-            teamInput.addEventListener('change', (ev) => {
-                const newTeam = ev.target.value.trim();
-                if (newTeam) {
-                    storedMaxHRData[`team_${athleteId}`] = newTeam;
-                } else {
-                    delete storedMaxHRData[`team_${athleteId}`];
-                }
-                // Also store name if not already stored
-                if (!storedName && name) {
-                    storedMaxHRData[`name_${athleteId}`] = name;
-                }
-                saveStoredMaxHRData();
-                // Update the meta span to reflect the change
-                const metaParts = [];
-                if (newTeam) metaParts.push(newTeam);
-                metaParts.push(`ID: ${athleteId}`);
-                metaSpan.textContent = metaParts.join(' · ');
-            });
-        }
+        // Team input (always visible in event viewer)
+        const teamInput = document.createElement('input');
+        teamInput.type = 'text';
+        teamInput.className = 'team-input';
+        teamInput.value = storedTeam || team;
+        teamInput.placeholder = 'Team';
+        teamInput.title = 'Team name';
+        teamInput.addEventListener('change', (ev) => {
+            const newTeam = ev.target.value.trim();
+            if (newTeam) {
+                storedMaxHRData[`team_${athleteId}`] = newTeam;
+            } else {
+                delete storedMaxHRData[`team_${athleteId}`];
+            }
+            // Also store name if not already stored
+            if (!storedName && name) {
+                storedMaxHRData[`name_${athleteId}`] = name;
+            }
+            saveStoredMaxHRData();
+            // Update the meta span to reflect the change
+            const metaParts = [];
+            if (newTeam) metaParts.push(newTeam);
+            metaParts.push(`ID: ${athleteId}`);
+            metaSpan.textContent = metaParts.join(' · ');
+        });
 
         // Max HR input
         const hrInput = document.createElement('input');
@@ -1073,9 +1099,7 @@ function renderEntrants(searchFilter = '') {
         }
 
         row.appendChild(infoDiv);
-        if (teamInput) {
-            row.appendChild(teamInput);
-        }
+        row.appendChild(teamInput);
         row.appendChild(hrInput);
         row.appendChild(powerInputs);
         container.appendChild(row);
@@ -1228,16 +1252,12 @@ function renderAthleteMaxList(searchFilter = '') {
         });
     }
 
-    // Check if team column is enabled
-    const settings = common.settingsStore.get();
-    const showTeamColumn = settings.showTeamColumn;
-
-    // Add header row
+    // Add header row (team column always visible in settings)
     const headerRow = document.createElement('div');
     headerRow.className = 'athlete-max-row athlete-max-header';
     headerRow.innerHTML = `
         <div class="athlete-info"><span class="header-label">Athlete</span></div>
-        ${showTeamColumn ? '<span class="header-label team-header">Team</span>' : ''}
+        <span class="header-label team-header">Team</span>
         <span class="header-label hr-header">HR</span>
         <div class="power-inputs header-power">
             ${POWER_COLUMNS.map(col => `<span class="header-label">${col.label}</span>`).join('')}
@@ -1296,30 +1316,27 @@ function renderAthleteMaxList(searchFilter = '') {
         metaSpan.textContent = metaParts.join(' · ');
         infoDiv.appendChild(metaSpan);
 
-        // Team input (if enabled)
-        let teamInput = null;
-        if (showTeamColumn) {
-            teamInput = document.createElement('input');
-            teamInput.type = 'text';
-            teamInput.className = 'team-input';
-            teamInput.value = team;
-            teamInput.placeholder = 'Team';
-            teamInput.title = 'Team name';
-            teamInput.addEventListener('change', (ev) => {
-                const newTeam = ev.target.value.trim();
-                if (newTeam) {
-                    storedMaxHRData[`team_${athleteId}`] = newTeam;
-                } else {
-                    delete storedMaxHRData[`team_${athleteId}`];
-                }
-                saveStoredMaxHRData();
-                // Update the meta span to reflect the change
-                const metaParts = [];
-                if (newTeam) metaParts.push(newTeam);
-                metaParts.push(`ID: ${athleteId}`);
-                metaSpan.textContent = metaParts.join(' · ');
-            });
-        }
+        // Team input (always visible in settings)
+        const teamInput = document.createElement('input');
+        teamInput.type = 'text';
+        teamInput.className = 'team-input';
+        teamInput.value = team;
+        teamInput.placeholder = 'Team';
+        teamInput.title = 'Team name';
+        teamInput.addEventListener('change', (ev) => {
+            const newTeam = ev.target.value.trim();
+            if (newTeam) {
+                storedMaxHRData[`team_${athleteId}`] = newTeam;
+            } else {
+                delete storedMaxHRData[`team_${athleteId}`];
+            }
+            saveStoredMaxHRData();
+            // Update the meta span to reflect the change
+            const metaParts = [];
+            if (newTeam) metaParts.push(newTeam);
+            metaParts.push(`ID: ${athleteId}`);
+            metaSpan.textContent = metaParts.join(' · ');
+        });
 
         // Max HR input
         const hrInput = document.createElement('input');
@@ -1392,9 +1409,7 @@ function renderAthleteMaxList(searchFilter = '') {
         });
 
         row.appendChild(infoDiv);
-        if (teamInput) {
-            row.appendChild(teamInput);
-        }
+        row.appendChild(teamInput);
         row.appendChild(hrInput);
         row.appendChild(powerInputs);
         row.appendChild(deleteBtn);

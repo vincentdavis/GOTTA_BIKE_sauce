@@ -91,6 +91,17 @@ html.solid-background body {
     color: #8BC34A;
 }
 
+.team-cell {
+    padding: 4px 8px;
+    text-align: left;
+    color: #aaa;
+    font-size: 0.9em;
+    max-width: 80px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
 /* Dialog overlay styles */
 .dialog-overlay {
     position: fixed;
@@ -622,7 +633,7 @@ html.solid-background body {
 }
 
 .power-inputs .power-input {
-    width: 45px;
+    width: 55px;
 }
 
 /* Athlete search bar */
@@ -681,7 +692,7 @@ html.solid-background body {
 }
 
 .header-power .header-label {
-    width: 45px;
+    width: 55px;
     display: inline-block;
     text-align: center;
 }
