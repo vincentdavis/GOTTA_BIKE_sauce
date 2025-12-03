@@ -24,9 +24,9 @@ const POWER_COLUMNS = [
 
 // Available draft columns
 const DRAFT_COLUMNS = [
-    { key: 'draftCur', field: 'draft', label: 'Draft', unit: 'W' },
-    { key: 'draftAvg', field: 'draftAvg', label: 'AvgDr', unit: 'W' },
-    { key: 'draftEnergy', field: 'draftEnergy', label: 'KJDr', unit: 'kJ' }
+    { key: 'draftCur', path: 'state.draft', label: 'Draft', unit: 'W' },
+    { key: 'draftAvg', path: 'stats.draft.avg', label: 'AvgDr', unit: 'W' },
+    { key: 'draftEnergy', path: 'stats.draft.kj', label: 'KJDr', unit: 'kJ' }
 ];
 
 // Default settings
@@ -49,14 +49,11 @@ common.settingsStore.setDefault({
     showDraftEnergy: false,
     // Team column setting
     showTeamColumn: true,
-    // Filter settings (checkboxes - combinable with OR logic)
-    filterShowAll: true,           // When true, ignores other filters
-    filterOnlyWithHR: false,       // Only riders broadcasting HR
-    filterInGroup: false,          // Same group as watched athlete
-    filterMarkedFollowing: false,  // Marked or following in Sauce4Zwift
-    filterSameEvent: false,        // Same event subgroup
-    filterByTeam: false,           // Enable team filter
-    filterTeamName: ''             // Team name to filter (when filterByTeam=true)
+    // Nearby athletes filter settings
+    refreshInterval: 2,            // Refresh interval in seconds
+    maxGap: 30,                    // Max gap in seconds to show riders
+    filterSameCategory: false,     // Only show riders in same event category
+    filterMarked: false            // Only show marked/followed riders
 });
 
 // Max HR storage key (global, shared across windows via leading /)
@@ -89,6 +86,7 @@ let sessionMaxHRData = {};  // Session-only: { athleteId: maxHR }
 let sessionMaxPowerData = {};  // Session-only: { athleteId_5s: maxPower, ... }
 let dialogAthleteId = null;
 let dialogAthleteName = null;
+let lastRenderTime = 0;  // Track last render time for refresh interval
 
 // Event viewer state
 let currentEvent = null;
@@ -117,9 +115,6 @@ export async function main() {
     loadStoredMaxHRData();
     loadStoredMaxPowerData();
 
-    // Migrate old showOnlyWithHR setting to new filter system
-    migrateOldSettings();
-
     doc.style.setProperty('--font-scale', common.settingsStore.get('fontScale') || 1);
     applyBackground();
 
@@ -130,7 +125,14 @@ export async function main() {
     common.subscribe('nearby', data => {
         if (!data || !data.length) return;
         nearbyData = data;
-        renderRiders();
+
+        // Throttle rendering based on refresh interval setting
+        const refreshInterval = (common.settingsStore.get('refreshInterval') || 2) * 1000;  // Convert to ms
+        const now = Date.now();
+        if (now - lastRenderTime >= refreshInterval) {
+            lastRenderTime = now;
+            renderRiders();
+        }
     });
 
     // Listen for settings changes
@@ -238,19 +240,6 @@ function updateMaxHR(athleteId, hr, name, team) {
     }
 }
 
-function migrateOldSettings() {
-    // Migrate old showOnlyWithHR setting to new filter system
-    const oldSetting = common.settingsStore.get('showOnlyWithHR');
-    if (oldSetting !== undefined) {
-        // If old setting was true, enable the new HR filter
-        if (oldSetting === true) {
-            common.settingsStore.set('filterOnlyWithHR', true);
-            common.settingsStore.set('filterShowAll', false);
-        }
-        // Remove the old setting
-        common.settingsStore.delete('showOnlyWithHR');
-    }
-}
 
 function applyBackground() {
     const option = common.settingsStore.get('backgroundOption') || 'transparent';
@@ -298,54 +287,33 @@ function truncateName(name, maxLen) {
 }
 
 function applyFilters(riders, settings, watchingAthlete) {
-    // If "Show All" is checked (or undefined/default), or no filters active, return unfiltered
-    const showAll = settings.filterShowAll !== false; // Default to true if undefined
-    const anyFilterActive = settings.filterOnlyWithHR || settings.filterInGroup ||
-        settings.filterMarkedFollowing || settings.filterSameEvent ||
-        (settings.filterByTeam && settings.filterTeamName);
-
-    if (showAll || !anyFilterActive) {
-        return riders;
-    }
+    const maxGap = settings.maxGap || 30;  // Default 30 seconds
+    const filterSameCategory = settings.filterSameCategory || false;
+    const filterMarked = settings.filterMarked || false;
 
     return riders.filter(athlete => {
-        // OR logic: rider passes if ANY enabled filter matches
+        // Always filter by max gap (time gap in seconds)
+        // The 'gap' field represents time gap in seconds from watching athlete
+        if (Math.abs(athlete.gap) > maxGap) {
+            return false;
+        }
 
-        if (settings.filterOnlyWithHR) {
-            if (athlete.state?.heartrate > 0) {
-                return true;
+        // If "Only same category" is enabled, filter to same event subgroup
+        if (filterSameCategory) {
+            if (!watchingAthlete?.state?.eventSubgroupId ||
+                athlete.state?.eventSubgroupId !== watchingAthlete.state.eventSubgroupId) {
+                return false;
             }
         }
 
-        if (settings.filterInGroup) {
-            // Check if athlete is in same group as watching
-            // Group membership determined by gap distance threshold (~3 seconds)
-            if (watchingAthlete && Math.abs(athlete.gap) <= 3) {
-                return true;
+        // If "Only marked" is enabled, filter to marked/followed riders
+        if (filterMarked) {
+            if (!athlete.athlete?.marked && !athlete.athlete?.following) {
+                return false;
             }
         }
 
-        if (settings.filterMarkedFollowing) {
-            if (athlete.athlete?.marked || athlete.athlete?.following) {
-                return true;
-            }
-        }
-
-        if (settings.filterSameEvent) {
-            if (watchingAthlete?.state?.eventSubgroupId &&
-                athlete.state?.eventSubgroupId === watchingAthlete.state.eventSubgroupId) {
-                return true;
-            }
-        }
-
-        if (settings.filterByTeam && settings.filterTeamName) {
-            const teamFilter = settings.filterTeamName.toLowerCase();
-            if (athlete.athlete?.team?.toLowerCase().includes(teamFilter)) {
-                return true;
-            }
-        }
-
-        return false; // No filter matched
+        return true;
     });
 }
 
@@ -539,31 +507,24 @@ function renderRiders() {
             settings[`show${col.key.charAt(0).toUpperCase() + col.key.slice(1)}`]
         );
 
-        // Debug: log athlete structure to find draft data (only for first athlete, once)
-        if (enabledDraftColumns.length > 0 && riders.indexOf(athlete) === 0 && !window._draftDebugLogged) {
-            window._draftDebugLogged = true;
-            console.log('Athlete data structure:', athlete);
-            console.log('athlete.stats:', athlete.stats);
-            console.log('athlete.state:', athlete.state);
-        }
-
         // Create draft cells for enabled columns
         const draftCells = [];
         for (const col of enabledDraftColumns) {
             const draftCell = document.createElement('td');
             draftCell.className = 'draft-cell';
 
-            // Get draft value - try multiple locations
-            let value = athlete.stats?.draft?.[col.field]
-                ?? athlete.state?.draft?.[col.field]
-                ?? athlete.stats?.[col.field]
-                ?? athlete.state?.[col.field];
+            // Get draft value using path (e.g., "state.draft" or "stats.draft.avg")
+            const pathParts = col.path.split('.');
+            let value = athlete;
+            for (const part of pathParts) {
+                value = value?.[part];
+            }
 
-            if (value !== undefined && value !== null) {
+            if (value !== undefined && value !== null && value !== 0) {
                 if (col.unit === 'kJ') {
-                    // Convert joules to kJ and format
-                    draftCell.textContent = (value / 1000).toFixed(1);
-                    draftCell.title = `${col.label}: ${(value / 1000).toFixed(1)} kJ`;
+                    // Already in kJ, format with 1 decimal
+                    draftCell.textContent = value.toFixed(1);
+                    draftCell.title = `${col.label}: ${value.toFixed(1)} kJ`;
                 } else {
                     // Watts - round to integer
                     draftCell.textContent = Math.round(value);

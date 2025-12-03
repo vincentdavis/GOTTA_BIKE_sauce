@@ -129,35 +129,25 @@
             </form>
 
             <form id="filter-options" class="section">
-                <div class="title">Rider Filters</div>
-                <p class="hint">Combine filters to include riders (OR logic)</p>
-                <label class="filter-checkbox">
-                    <input type="checkbox" name="filterShowAll">
-                    <key>Show All (disable filters)</key>
+                <div class="title">Nearby Athletes</div>
+                <label>
+                    <key>Refresh interval:</key>
+                    <input type="number" name="refreshInterval" min="1" max="10" step="1" style="--size: 4"/>
+                    <span class="unit">sec</span>
+                </label>
+                <label>
+                    <key>Max gap:</key>
+                    <input type="number" name="maxGap" min="5" max="300" step="5" style="--size: 4"/>
+                    <span class="unit">sec</span>
                 </label>
                 <label class="filter-checkbox">
-                    <input type="checkbox" name="filterOnlyWithHR">
-                    <key>Only with Heart Rate</key>
+                    <input type="checkbox" name="filterSameCategory">
+                    <key>Only same category</key>
                 </label>
                 <label class="filter-checkbox">
-                    <input type="checkbox" name="filterInGroup">
-                    <key>In My Group</key>
+                    <input type="checkbox" name="filterMarked">
+                    <key>Only marked</key>
                 </label>
-                <label class="filter-checkbox">
-                    <input type="checkbox" name="filterMarkedFollowing">
-                    <key>Marked / Following</key>
-                </label>
-                <label class="filter-checkbox">
-                    <input type="checkbox" name="filterSameEvent">
-                    <key>Same Event</key>
-                </label>
-                <label class="filter-checkbox">
-                    <input type="checkbox" name="filterByTeam">
-                    <key>By Team</key>
-                </label>
-                <div class="team-filter-input">
-                    <input type="text" name="filterTeamName" placeholder="Team name to filter">
-                </div>
             </form>
 
             <div class="section">
