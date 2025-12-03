@@ -11,6 +11,7 @@
         <link id="favicon" rel="shortcut icon" href="/pages/images/favicon.png"/>
         <link rel="stylesheet" href="/pages/css/common.css"/>
         <link rel="stylesheet" href="./css/hr-zone-monitor.css"/>
+        <link rel="stylesheet" href="./css/event-viewer.css"/>
 
         <script type="module">
             import {settingsMain} from './src/hr-zone-monitor.mjs';
@@ -21,13 +22,21 @@
         <div id="titlebar">
             <header>
                 <div class="logo"><img src="/pages/images/icon128.png"/></div>
-                <div class="title">GOTTA.BIKE sauce - Settings</div>
+                <div class="title">GOTTA.BIKE sauce</div>
                 <div class="filler"></div>
                 <div class="buttons">
                     <div title="Close this window" class="button close electron-only"><ms>close</ms></div>
                 </div>
             </header>
         </div>
+
+        <div class="tab-navigation">
+            <button type="button" class="tab-btn active" data-tab="settings-tab">Settings</button>
+            <button type="button" class="tab-btn" data-tab="events-tab">Event Viewer</button>
+            <button type="button" class="tab-btn" data-tab="help-tab">Help</button>
+        </div>
+
+        <div id="settings-tab" class="tab-panel active">
         <div id="settings">
             <form id="options" class="section">
                 <div class="title">Display Settings</div>
@@ -67,6 +76,10 @@
                     <key>Theme override:</key>
                     <select is="sauce-theme" override></select>
                 </label>
+                <label class="filter-checkbox">
+                    <input type="checkbox" name="showTeamColumn">
+                    <key>Show Team column</key>
+                </label>
             </form>
 
             <form id="power-columns" class="section">
@@ -92,6 +105,25 @@
                     <label class="filter-checkbox">
                         <input type="checkbox" name="showPower1200s">
                         <key>20 min</key>
+                    </label>
+                </div>
+            </form>
+
+            <form id="draft-columns" class="section">
+                <div class="title">Draft Columns</div>
+                <p class="hint">Select which draft savings columns to display</p>
+                <div class="power-column-options">
+                    <label class="filter-checkbox">
+                        <input type="checkbox" name="showDraftCur">
+                        <key>Current (W)</key>
+                    </label>
+                    <label class="filter-checkbox">
+                        <input type="checkbox" name="showDraftAvg">
+                        <key>Average (W)</key>
+                    </label>
+                    <label class="filter-checkbox">
+                        <input type="checkbox" name="showDraftEnergy">
+                        <key>Energy (kJ)</key>
                     </label>
                 </div>
             </form>
@@ -167,5 +199,141 @@
                 </div>
             </div>
         </div>
+        </div><!-- end #settings-tab -->
+
+        <div id="events-tab" class="tab-panel">
+            <div id="event-viewer-content">
+                <div class="input-section">
+                    <input type="text" id="event-input" placeholder="Enter Event ID or Zwift event URL..."/>
+                    <button type="button" id="load-event-btn">Load</button>
+                </div>
+
+                <div id="cached-events-section">
+                    <label for="cached-events">Or select a recent event:</label>
+                    <select id="cached-events">
+                        <option value="">-- Select Event --</option>
+                    </select>
+                </div>
+
+                <div id="event-info" hidden>
+                    <div class="event-header">
+                        <h2 id="event-name"></h2>
+                        <div id="event-start"></div>
+                    </div>
+
+                    <div class="subgroup-selector">
+                        <label for="subgroup-select">Category:</label>
+                        <select id="subgroup-select">
+                            <option value="">-- Select Category --</option>
+                        </select>
+                    </div>
+
+                    <div id="subgroup-info" hidden>
+                        <div class="subgroup-details">
+                            <span class="detail"><strong>Route:</strong> <span id="sg-route"></span></span>
+                            <span class="detail"><strong>Distance:</strong> <span id="sg-distance"></span></span>
+                            <span class="detail"><strong>Laps:</strong> <span id="sg-laps"></span></span>
+                            <span class="detail"><strong>Start:</strong> <span id="sg-start"></span></span>
+                        </div>
+                    </div>
+
+                    <div id="entrants-section" hidden>
+                        <h3>Entrants (<span id="entrant-count">0</span>)</h3>
+                        <div class="search-bar">
+                            <input type="text" id="entrant-search" placeholder="Search by name..."/>
+                        </div>
+                        <div id="entrants-list"></div>
+                    </div>
+                </div>
+
+                <div id="loading" hidden>
+                    <div class="spinner"></div>
+                    <span>Loading...</span>
+                </div>
+
+                <div id="error-message" hidden></div>
+            </div>
+        </div><!-- end #events-tab -->
+
+        <div id="help-tab" class="tab-panel">
+            <div class="help-content">
+                <div class="section">
+                    <div class="title">About GOTTA.BIKE sauce</div>
+                    <p>A Sauce4Zwift mod that displays nearby riders with heart rate and power data color-coded by training zones.</p>
+                </div>
+
+                <div class="section">
+                    <div class="title">Main Window</div>
+                    <p>The main overlay shows nearby riders with:</p>
+                    <ul>
+                        <li><strong>Rider Name</strong> - Click a row to set max HR</li>
+                        <li><strong>%HR</strong> - Heart rate as percentage of max HR, color-coded by zone</li>
+                        <li><strong>Power Columns</strong> - Smoothed power as percentage of max, color-coded</li>
+                        <li><strong>Draft Columns</strong> - Draft savings in watts or energy saved in kJ</li>
+                    </ul>
+                </div>
+
+                <div class="section">
+                    <div class="title">HR &amp; Power Zones</div>
+                    <p>Both HR and power use the same zone thresholds:</p>
+                    <ul>
+                        <li><span class="zone-sample" style="background:#888888;">Gray</span> - Below 60% (Recovery)</li>
+                        <li><span class="zone-sample" style="background:#2196F3;">Blue</span> - 60-70% (Endurance)</li>
+                        <li><span class="zone-sample" style="background:#4CAF50;">Green</span> - 70-80% (Tempo)</li>
+                        <li><span class="zone-sample" style="background:#FFEB3B;color:#000;">Yellow</span> - 80-90% (Threshold)</li>
+                        <li><span class="zone-sample" style="background:#F44336;">Red</span> - 90%+ (VO2 Max)</li>
+                    </ul>
+                </div>
+
+                <div class="section">
+                    <div class="title">Max Value Modes</div>
+                    <ul>
+                        <li><strong>Session only</strong> - Max values reset each ride. Good for seeing current session peaks.</li>
+                        <li><strong>Stored</strong> - Max values persist and auto-update, as observed during ride. Better for tracking athletes over time. You can also maualy edit the values</li>
+                    </ul>
+                </div>
+
+                <div class="section">
+                    <div class="title">Event Viewer</div>
+                    <p>Look up Zwift events by ID or URL to see entrants and set their max values before a race:</p>
+                    <ul>
+                        <li>Enter an event ID (e.g., <code>1234567</code>)</li>
+                        <li>Or paste a Zwift event URL</li>
+                        <li>Select a category to see entrants</li>
+                        <li>Edit max HR, power, and team values for each athlete</li>
+                    </ul>
+                </div>
+
+                <div class="section">
+                    <div class="title">Filters</div>
+                    <p>Use filters to show specific riders. When multiple filters are enabled, riders matching ANY filter are shown (OR logic):</p>
+                    <ul>
+                        <li><strong>Show All</strong> - Disables all filters</li>
+                        <li><strong>Only with HR</strong> - Riders broadcasting heart rate</li>
+                        <li><strong>In My Group</strong> - Riders within ~3 seconds gap</li>
+                        <li><strong>Marked/Following</strong> - Riders you've marked or follow</li>
+                        <li><strong>Same Event</strong> - Riders in same event subgroup</li>
+                        <li><strong>By Team</strong> - Filter by team name</li>
+                    </ul>
+                </div>
+
+                <div class="section">
+                    <div class="title">Tips</div>
+                    <ul>
+                        <li>Click any rider row in the main window to quickly set their max HR</li>
+                        <li>Use Event Viewer before a race to pre-populate competitor data</li>
+                        <li>Team names are saved with athlete data for easy identification</li>
+                        <li>Draft columns show watts saved from drafting - useful for group rides</li>
+                    </ul>
+                </div>
+
+                <div class="section">
+                    <div class="title">Links</div>
+                    <p>
+                        <a href="https://gotta.bike" target="_blank">gotta.bike</a>
+                    </p>
+                </div>
+            </div>
+        </div><!-- end #help-tab -->
     </body>
 </html>

@@ -22,6 +22,13 @@ const POWER_COLUMNS = [
     { key: 'power1200s', seconds: 1200, label: '20m' }
 ];
 
+// Available draft columns
+const DRAFT_COLUMNS = [
+    { key: 'draftCur', field: 'draft', label: 'Draft', unit: 'W' },
+    { key: 'draftAvg', field: 'draftAvg', label: 'AvgDr', unit: 'W' },
+    { key: 'draftEnergy', field: 'draftEnergy', label: 'KJDr', unit: 'kJ' }
+];
+
 // Default settings
 common.settingsStore.setDefault({
     fontScale: 1,
@@ -36,6 +43,12 @@ common.settingsStore.setDefault({
     showPower60s: true,
     showPower300s: false,
     showPower1200s: false,
+    // Draft column settings
+    showDraftCur: false,
+    showDraftAvg: false,
+    showDraftEnergy: false,
+    // Team column setting
+    showTeamColumn: false,
     // Filter settings (checkboxes - combinable with OR logic)
     filterShowAll: true,           // When true, ignores other filters
     filterOnlyWithHR: false,       // Only riders broadcasting HR
@@ -76,6 +89,10 @@ let sessionMaxHRData = {};  // Session-only: { athleteId: maxHR }
 let sessionMaxPowerData = {};  // Session-only: { athleteId_5s: maxPower, ... }
 let dialogAthleteId = null;
 let dialogAthleteName = null;
+
+// Event viewer state
+let currentEvent = null;
+let currentEntrants = [];
 
 // Helper to get effective max values based on mode
 function getEffectiveMaxHR(athleteId) {
@@ -506,6 +523,37 @@ function renderRiders() {
             powerCells.push(powerCell);
         }
 
+        // Get enabled draft columns
+        const enabledDraftColumns = DRAFT_COLUMNS.filter(col =>
+            settings[`show${col.key.charAt(0).toUpperCase() + col.key.slice(1)}`]
+        );
+
+        // Create draft cells for enabled columns
+        const draftCells = [];
+        for (const col of enabledDraftColumns) {
+            const draftCell = document.createElement('td');
+            draftCell.className = 'draft-cell';
+
+            // Get draft value from athlete.stats.draft
+            let value = athlete.stats?.draft?.[col.field];
+
+            if (value !== undefined && value !== null) {
+                if (col.unit === 'kJ') {
+                    // Convert joules to kJ and format
+                    draftCell.textContent = (value / 1000).toFixed(1);
+                    draftCell.title = `${col.label}: ${(value / 1000).toFixed(1)} kJ`;
+                } else {
+                    // Watts - round to integer
+                    draftCell.textContent = Math.round(value);
+                    draftCell.title = `${col.label}: ${Math.round(value)} W`;
+                }
+            } else {
+                draftCell.textContent = '-';
+            }
+
+            draftCells.push(draftCell);
+        }
+
         // Add watching indicator
         if (athlete.watching) {
             row.classList.add('watching');
@@ -514,6 +562,9 @@ function renderRiders() {
         row.appendChild(nameCell);
         row.appendChild(hrCell);
         for (const cell of powerCells) {
+            row.appendChild(cell);
+        }
+        for (const cell of draftCells) {
             row.appendChild(cell);
         }
         tbody.appendChild(row);
@@ -532,9 +583,19 @@ function updateTableHeaders(settings) {
         settings[`show${col.key.charAt(0).toUpperCase() + col.key.slice(1)}`]
     );
 
-    // Rebuild headers: Rider, %HR, then power columns
+    // Get enabled draft columns
+    const enabledDraftColumns = DRAFT_COLUMNS.filter(col =>
+        settings[`show${col.key.charAt(0).toUpperCase() + col.key.slice(1)}`]
+    );
+
+    // Rebuild headers: Rider, %HR, power columns, draft columns
     thead.innerHTML = '<th>Rider</th><th>%HR</th>';
     for (const col of enabledPowerColumns) {
+        const th = document.createElement('th');
+        th.textContent = col.label;
+        thead.appendChild(th);
+    }
+    for (const col of enabledDraftColumns) {
         const th = document.createElement('th');
         th.textContent = col.label;
         thead.appendChild(th);
@@ -546,6 +607,7 @@ export async function settingsMain() {
     common.initInteractionListeners();
     await common.initSettingsForm('form#options')();
     await common.initSettingsForm('form#power-columns')();
+    await common.initSettingsForm('form#draft-columns')();
     await common.initSettingsForm('form#filter-options')();
 
     loadStoredMaxHRData();
@@ -553,6 +615,8 @@ export async function settingsMain() {
     renderAthleteMaxList();
     setupBackgroundOptionToggle();
     setupAthleteSearch();
+    setupTabNavigation();
+    setupEventViewer();
 
     // Add rider button handler
     const addBtn = document.getElementById('add-rider-btn');
@@ -590,6 +654,508 @@ export async function settingsMain() {
             renderAthleteMaxListWithCurrentSearch();
         }
     });
+}
+
+// Tab navigation
+function setupTabNavigation() {
+    const tabBtns = document.querySelectorAll('.tab-btn');
+    const tabPanels = document.querySelectorAll('.tab-panel');
+
+    tabBtns.forEach(btn => {
+        btn.addEventListener('click', () => {
+            const targetTab = btn.dataset.tab;
+
+            // Update button states
+            tabBtns.forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+
+            // Update panel visibility
+            tabPanels.forEach(panel => {
+                panel.classList.toggle('active', panel.id === targetTab);
+            });
+        });
+    });
+}
+
+// Event Viewer functions
+async function setupEventViewer() {
+    // Load cached events on startup
+    await loadCachedEvents();
+
+    const loadBtn = document.getElementById('load-event-btn');
+    const eventInput = document.getElementById('event-input');
+    const cachedSelect = document.getElementById('cached-events');
+    const subgroupSelect = document.getElementById('subgroup-select');
+    const entrantSearch = document.getElementById('entrant-search');
+
+    if (loadBtn) {
+        loadBtn.addEventListener('click', () => {
+            const input = eventInput.value.trim();
+            if (input) {
+                const eventId = parseEventInput(input);
+                if (eventId) {
+                    loadEvent(eventId);
+                } else {
+                    showEventError('Invalid event ID or URL');
+                }
+            }
+        });
+    }
+
+    if (eventInput) {
+        eventInput.addEventListener('keypress', (ev) => {
+            if (ev.key === 'Enter') {
+                loadBtn.click();
+            }
+        });
+    }
+
+    if (cachedSelect) {
+        cachedSelect.addEventListener('change', () => {
+            const eventId = cachedSelect.value;
+            if (eventId) {
+                loadEvent(parseInt(eventId));
+            }
+        });
+    }
+
+    if (subgroupSelect) {
+        subgroupSelect.addEventListener('change', () => {
+            const subgroupId = subgroupSelect.value;
+            if (subgroupId && currentEvent) {
+                loadSubgroupEntrants(parseInt(subgroupId));
+            } else {
+                document.getElementById('subgroup-info').hidden = true;
+                document.getElementById('entrants-section').hidden = true;
+            }
+        });
+    }
+
+    if (entrantSearch) {
+        entrantSearch.addEventListener('input', () => {
+            renderEntrants(entrantSearch.value);
+        });
+    }
+}
+
+async function loadCachedEvents() {
+    try {
+        const cachedEvents = await common.rpc.getCachedEvents();
+        const select = document.getElementById('cached-events');
+        if (!select) return;
+
+        // Clear existing options except the first one
+        select.innerHTML = '<option value="">-- Select Event --</option>';
+
+        if (cachedEvents && cachedEvents.length > 0) {
+            // Sort by start time, most recent first
+            cachedEvents.sort((a, b) => new Date(b.eventStart) - new Date(a.eventStart));
+
+            for (const event of cachedEvents) {
+                const opt = document.createElement('option');
+                opt.value = event.id;
+                const startDate = new Date(event.eventStart);
+                opt.textContent = `${event.name} (${formatEventDate(startDate)})`;
+                select.appendChild(opt);
+            }
+        }
+    } catch (err) {
+        console.error('Failed to load cached events:', err);
+    }
+}
+
+function parseEventInput(input) {
+    // Try to parse as a number (event ID)
+    const numericId = parseInt(input);
+    if (!isNaN(numericId) && numericId > 0) {
+        return numericId;
+    }
+
+    // Try to extract event ID from Zwift URL
+    const urlMatch = input.match(/zwift\.com\/events\/view\/(\d+)/i);
+    if (urlMatch) {
+        return parseInt(urlMatch[1]);
+    }
+
+    // Try to extract from invite link format
+    const inviteMatch = input.match(/events\/view\/(\d+)/i);
+    if (inviteMatch) {
+        return parseInt(inviteMatch[1]);
+    }
+
+    return null;
+}
+
+async function loadEvent(eventId) {
+    showEventLoading(true);
+    hideEventError();
+    document.getElementById('event-info').hidden = true;
+
+    try {
+        const event = await common.rpc.getEvent(eventId);
+
+        if (!event) {
+            showEventError(`Event ${eventId} not found`);
+            return;
+        }
+
+        currentEvent = event;
+        displayEventInfo(event);
+    } catch (err) {
+        console.error('Failed to load event:', err);
+        showEventError(`Failed to load event: ${err.message}`);
+    } finally {
+        showEventLoading(false);
+    }
+}
+
+function displayEventInfo(event) {
+    document.getElementById('event-name').textContent = event.name;
+
+    const startDate = new Date(event.eventStart);
+    document.getElementById('event-start').textContent = formatEventDateTime(startDate);
+
+    // Populate subgroup selector
+    const subgroupSelect = document.getElementById('subgroup-select');
+    subgroupSelect.innerHTML = '<option value="">-- Select Category --</option>';
+
+    if (event.eventSubgroups && event.eventSubgroups.length > 0) {
+        // Sort subgroups by label
+        const sortedSubgroups = [...event.eventSubgroups].sort((a, b) => {
+            return (a.subgroupLabel || '').localeCompare(b.subgroupLabel || '');
+        });
+
+        for (const sg of sortedSubgroups) {
+            const opt = document.createElement('option');
+            opt.value = sg.id;
+            let label = sg.subgroupLabel || `Subgroup ${sg.id}`;
+            if (sg.rangeAccessLabel) {
+                label += ` (${sg.rangeAccessLabel})`;
+            }
+            opt.textContent = label;
+            subgroupSelect.appendChild(opt);
+        }
+    }
+
+    document.getElementById('event-info').hidden = false;
+    document.getElementById('subgroup-info').hidden = true;
+    document.getElementById('entrants-section').hidden = true;
+}
+
+async function loadSubgroupEntrants(subgroupId) {
+    showEventLoading(true);
+
+    try {
+        // Get subgroup details
+        const sgInfo = await common.rpc.getEventSubgroup(subgroupId);
+        displaySubgroupInfo(sgInfo);
+
+        // Get entrants
+        const entrants = await common.rpc.getEventSubgroupEntrants(subgroupId);
+        currentEntrants = entrants || [];
+
+        document.getElementById('entrant-count').textContent = currentEntrants.length;
+        document.getElementById('entrant-search').value = '';
+        renderEntrants();
+
+        document.getElementById('entrants-section').hidden = false;
+    } catch (err) {
+        console.error('Failed to load subgroup entrants:', err);
+        showEventError(`Failed to load entrants: ${err.message}`);
+    } finally {
+        showEventLoading(false);
+    }
+}
+
+function displaySubgroupInfo(sgInfo) {
+    if (!sgInfo) {
+        document.getElementById('subgroup-info').hidden = true;
+        return;
+    }
+
+    // Route info
+    document.getElementById('sg-route').textContent =
+        sgInfo.routeId ? `Route ${sgInfo.routeId} (Course ${sgInfo.courseId})` : 'N/A';
+
+    // Distance
+    if (sgInfo.distanceInMeters) {
+        const km = (sgInfo.distanceInMeters / 1000).toFixed(1);
+        const mi = (sgInfo.distanceInMeters / 1609.34).toFixed(1);
+        document.getElementById('sg-distance').textContent = `${km} km (${mi} mi)`;
+    } else {
+        document.getElementById('sg-distance').textContent = 'N/A';
+    }
+
+    // Laps
+    document.getElementById('sg-laps').textContent = sgInfo.laps || 'N/A';
+
+    // Start time
+    if (sgInfo.eventSubgroupStart) {
+        const startDate = new Date(sgInfo.eventSubgroupStart);
+        document.getElementById('sg-start').textContent = formatEventDateTime(startDate);
+    } else {
+        document.getElementById('sg-start').textContent = 'N/A';
+    }
+
+    document.getElementById('subgroup-info').hidden = false;
+}
+
+function renderEntrants(searchFilter = '') {
+    const container = document.getElementById('entrants-list');
+    if (!container) return;
+
+    container.innerHTML = '';
+
+    let filteredEntrants = currentEntrants;
+
+    if (searchFilter) {
+        const filterLower = searchFilter.toLowerCase();
+        filteredEntrants = currentEntrants.filter(entrant => {
+            const name = getEntrantName(entrant).toLowerCase();
+            const team = (entrant.team || '').toLowerCase();
+            const idStr = String(entrant.id || entrant.athleteId || '');
+            return name.includes(filterLower) || team.includes(filterLower) || idStr.includes(filterLower);
+        });
+    }
+
+    // Check if team column is enabled
+    const settings = common.settingsStore.get();
+    const showTeamColumn = settings.showTeamColumn;
+
+    // Add header row
+    const headerRow = document.createElement('div');
+    headerRow.className = 'athlete-max-row athlete-max-header';
+    headerRow.innerHTML = `
+        <div class="athlete-info"><span class="header-label">Athlete</span></div>
+        ${showTeamColumn ? '<span class="header-label team-header">Team</span>' : ''}
+        <span class="header-label hr-header">HR</span>
+        <div class="power-inputs header-power">
+            ${POWER_COLUMNS.map(col => `<span class="header-label">${col.label}</span>`).join('')}
+        </div>
+    `;
+    container.appendChild(headerRow);
+
+    if (filteredEntrants.length === 0) {
+        const emptyMsg = document.createElement('div');
+        emptyMsg.className = 'no-riders';
+        emptyMsg.textContent = searchFilter ? 'No entrants match your search.' : 'No entrants found';
+        container.appendChild(emptyMsg);
+        return;
+    }
+
+    // Sort by name
+    filteredEntrants.sort((a, b) => {
+        return getEntrantName(a).localeCompare(getEntrantName(b));
+    });
+
+    for (const entrant of filteredEntrants) {
+        const athleteId = entrant.id || entrant.athleteId;
+        const name = getEntrantName(entrant);
+        const team = entrant.team || '';
+
+        // Get stored values for this athlete
+        const maxHR = storedMaxHRData[athleteId] || '';
+        const storedName = storedMaxHRData[`name_${athleteId}`];
+        const storedTeam = storedMaxHRData[`team_${athleteId}`];
+
+        const row = document.createElement('div');
+        row.className = 'athlete-max-row';
+
+        // Name, team, and ID info
+        const infoDiv = document.createElement('div');
+        infoDiv.className = 'athlete-info';
+
+        const nameSpan = document.createElement('span');
+        nameSpan.className = 'athlete-name';
+        nameSpan.textContent = name;
+        infoDiv.appendChild(nameSpan);
+
+        const metaSpan = document.createElement('span');
+        metaSpan.className = 'athlete-meta';
+        const metaParts = [];
+        const displayTeam = storedTeam || team;
+        if (displayTeam) metaParts.push(displayTeam);
+        metaParts.push(`ID: ${athleteId}`);
+        metaSpan.textContent = metaParts.join(' · ');
+        infoDiv.appendChild(metaSpan);
+
+        // Team input (if enabled)
+        let teamInput = null;
+        if (showTeamColumn) {
+            teamInput = document.createElement('input');
+            teamInput.type = 'text';
+            teamInput.className = 'team-input';
+            teamInput.value = storedTeam || team;
+            teamInput.placeholder = 'Team';
+            teamInput.title = 'Team name';
+            teamInput.addEventListener('change', (ev) => {
+                const newTeam = ev.target.value.trim();
+                if (newTeam) {
+                    storedMaxHRData[`team_${athleteId}`] = newTeam;
+                } else {
+                    delete storedMaxHRData[`team_${athleteId}`];
+                }
+                // Also store name if not already stored
+                if (!storedName && name) {
+                    storedMaxHRData[`name_${athleteId}`] = name;
+                }
+                saveStoredMaxHRData();
+                // Update the meta span to reflect the change
+                const metaParts = [];
+                if (newTeam) metaParts.push(newTeam);
+                metaParts.push(`ID: ${athleteId}`);
+                metaSpan.textContent = metaParts.join(' · ');
+            });
+        }
+
+        // Max HR input
+        const hrInput = document.createElement('input');
+        hrInput.type = 'number';
+        hrInput.className = 'max-value-input';
+        hrInput.value = maxHR;
+        hrInput.min = 100;
+        hrInput.max = 250;
+        hrInput.placeholder = 'HR';
+        hrInput.title = 'Max HR';
+        hrInput.addEventListener('change', (ev) => {
+            const newMaxHR = parseInt(ev.target.value);
+            if (newMaxHR >= 100 && newMaxHR <= 250) {
+                storedMaxHRData[athleteId] = Math.round(newMaxHR);
+                // Also store name and team if not already stored
+                if (!storedName && name) {
+                    storedMaxHRData[`name_${athleteId}`] = name;
+                }
+                if (!storedTeam && team) {
+                    storedMaxHRData[`team_${athleteId}`] = team;
+                }
+                saveStoredMaxHRData();
+            } else if (ev.target.value === '') {
+                delete storedMaxHRData[athleteId];
+                saveStoredMaxHRData();
+            }
+        });
+
+        // Power inputs container
+        const powerInputs = document.createElement('div');
+        powerInputs.className = 'power-inputs';
+
+        for (const col of POWER_COLUMNS) {
+            const powerKey = `${athleteId}_${col.seconds}s`;
+            const powerValue = storedMaxPowerData[powerKey] || '';
+
+            const powerInput = document.createElement('input');
+            powerInput.type = 'number';
+            powerInput.className = 'max-value-input power-input';
+            powerInput.value = powerValue;
+            powerInput.min = 0;
+            powerInput.max = 2500;
+            powerInput.placeholder = col.label;
+            powerInput.title = `Max ${col.label} power`;
+            powerInput.addEventListener('change', (ev) => {
+                const newPower = parseInt(ev.target.value);
+                if (newPower > 0) {
+                    storedMaxPowerData[powerKey] = Math.round(newPower);
+                    // Also store name and team if not already stored
+                    if (!storedName && name) {
+                        storedMaxHRData[`name_${athleteId}`] = name;
+                    }
+                    if (!storedTeam && team) {
+                        storedMaxHRData[`team_${athleteId}`] = team;
+                        saveStoredMaxHRData();
+                    }
+                    saveStoredMaxPowerData();
+                } else if (ev.target.value === '') {
+                    delete storedMaxPowerData[powerKey];
+                    saveStoredMaxPowerData();
+                }
+            });
+            powerInputs.appendChild(powerInput);
+        }
+
+        row.appendChild(infoDiv);
+        if (teamInput) {
+            row.appendChild(teamInput);
+        }
+        row.appendChild(hrInput);
+        row.appendChild(powerInputs);
+        container.appendChild(row);
+    }
+}
+
+function getEntrantName(entrant) {
+    // Try various field name combinations the API might use
+    if (entrant.firstName && entrant.lastName) {
+        return `${entrant.firstName} ${entrant.lastName}`;
+    }
+    if (entrant.first_name && entrant.last_name) {
+        return `${entrant.first_name} ${entrant.last_name}`;
+    }
+    if (entrant.sanitizedFullname) {
+        return entrant.sanitizedFullname;
+    }
+    if (entrant.fullName) {
+        return entrant.fullName;
+    }
+    if (entrant.name) {
+        return entrant.name;
+    }
+    if (entrant.athlete?.sanitizedFullname) {
+        return entrant.athlete.sanitizedFullname;
+    }
+    if (entrant.athlete?.firstName && entrant.athlete?.lastName) {
+        return `${entrant.athlete.firstName} ${entrant.athlete.lastName}`;
+    }
+    if (entrant.firstName) {
+        return entrant.firstName;
+    }
+    if (entrant.lastName) {
+        return entrant.lastName;
+    }
+    if (entrant.first_name) {
+        return entrant.first_name;
+    }
+    if (entrant.last_name) {
+        return entrant.last_name;
+    }
+    // Log the entrant structure to help debug
+    console.log('Unknown entrant structure:', Object.keys(entrant), entrant);
+    return `Athlete ${entrant.id || entrant.athleteId || 'Unknown'}`;
+}
+
+function formatEventDate(date) {
+    return date.toLocaleDateString(undefined, {
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric'
+    });
+}
+
+function formatEventDateTime(date) {
+    return date.toLocaleString(undefined, {
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+    });
+}
+
+function showEventLoading(show) {
+    const el = document.getElementById('loading');
+    if (el) el.hidden = !show;
+}
+
+function showEventError(message) {
+    const errorEl = document.getElementById('error-message');
+    if (errorEl) {
+        errorEl.textContent = message;
+        errorEl.hidden = false;
+    }
+}
+
+function hideEventError() {
+    const el = document.getElementById('error-message');
+    if (el) el.hidden = true;
 }
 
 function renderAthleteMaxListWithCurrentSearch() {
@@ -662,11 +1228,16 @@ function renderAthleteMaxList(searchFilter = '') {
         });
     }
 
+    // Check if team column is enabled
+    const settings = common.settingsStore.get();
+    const showTeamColumn = settings.showTeamColumn;
+
     // Add header row
     const headerRow = document.createElement('div');
     headerRow.className = 'athlete-max-row athlete-max-header';
     headerRow.innerHTML = `
         <div class="athlete-info"><span class="header-label">Athlete</span></div>
+        ${showTeamColumn ? '<span class="header-label team-header">Team</span>' : ''}
         <span class="header-label hr-header">HR</span>
         <div class="power-inputs header-power">
             ${POWER_COLUMNS.map(col => `<span class="header-label">${col.label}</span>`).join('')}
@@ -724,6 +1295,31 @@ function renderAthleteMaxList(searchFilter = '') {
         metaParts.push(`ID: ${athleteId}`);
         metaSpan.textContent = metaParts.join(' · ');
         infoDiv.appendChild(metaSpan);
+
+        // Team input (if enabled)
+        let teamInput = null;
+        if (showTeamColumn) {
+            teamInput = document.createElement('input');
+            teamInput.type = 'text';
+            teamInput.className = 'team-input';
+            teamInput.value = team;
+            teamInput.placeholder = 'Team';
+            teamInput.title = 'Team name';
+            teamInput.addEventListener('change', (ev) => {
+                const newTeam = ev.target.value.trim();
+                if (newTeam) {
+                    storedMaxHRData[`team_${athleteId}`] = newTeam;
+                } else {
+                    delete storedMaxHRData[`team_${athleteId}`];
+                }
+                saveStoredMaxHRData();
+                // Update the meta span to reflect the change
+                const metaParts = [];
+                if (newTeam) metaParts.push(newTeam);
+                metaParts.push(`ID: ${athleteId}`);
+                metaSpan.textContent = metaParts.join(' · ');
+            });
+        }
 
         // Max HR input
         const hrInput = document.createElement('input');
@@ -796,6 +1392,9 @@ function renderAthleteMaxList(searchFilter = '') {
         });
 
         row.appendChild(infoDiv);
+        if (teamInput) {
+            row.appendChild(teamInput);
+        }
         row.appendChild(hrInput);
         row.appendChild(powerInputs);
         row.appendChild(deleteBtn);
