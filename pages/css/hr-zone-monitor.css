@@ -322,6 +322,32 @@ html.solid-background body {
     color: #fff;
 }
 
+.update-btn {
+    background: #2196F3;
+    border: none;
+    color: white;
+    padding: 4px 8px;
+    border-radius: 4px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 32px;
+}
+
+.update-btn:hover {
+    background: #1976D2;
+}
+
+.update-btn:disabled {
+    background: #555;
+    cursor: wait;
+}
+
+.update-btn ms {
+    font-size: 1.2em;
+}
+
 .delete-btn {
     background: #f44336;
     border: none;

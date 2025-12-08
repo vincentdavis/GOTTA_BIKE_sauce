@@ -923,6 +923,7 @@ function renderEntrants(searchFilter = '') {
         <div class="power-inputs header-power">
             ${POWER_COLUMNS.map(col => `<span class="header-label">${col.label}</span>`).join('')}
         </div>
+        <span class="header-label update-header"></span>
     `;
     container.appendChild(headerRow);
 
@@ -1060,10 +1061,49 @@ function renderEntrants(searchFilter = '') {
             powerInputs.appendChild(powerInput);
         }
 
+        // Update button (fetch from ZwiftPower)
+        const updateBtn = document.createElement('button');
+        updateBtn.type = 'button';
+        updateBtn.className = 'update-btn';
+        updateBtn.innerHTML = '<ms>sync</ms>';
+        updateBtn.title = 'Update from ZwiftPower';
+        updateBtn.addEventListener('click', async () => {
+            // Get saved credentials
+            const credentials = common.settingsStore.get(ZP_CREDENTIALS_KEY);
+            if (!credentials?.username || !credentials?.password) {
+                alert('Please save your ZwiftPower credentials in the ZwiftPower tab first.');
+                return;
+            }
+
+            // Check if server is running
+            const serverRunning = await checkZpServer();
+            if (!serverRunning) {
+                alert('ZwiftPower fetch server is not running.\n\nStart it with: node zp-fetch.mjs --server');
+                return;
+            }
+
+            // Show loading state
+            updateBtn.disabled = true;
+            updateBtn.innerHTML = '<span class="spinner-inline"></span>';
+
+            try {
+                const profile = await fetchFromServer(athleteId, credentials);
+                displayZpProfile(profile);
+                // Re-render the entrants list to show updated values
+                renderEntrants(document.getElementById('entrant-search')?.value || '');
+            } catch (error) {
+                alert(`Failed to update: ${error.message}`);
+            } finally {
+                updateBtn.disabled = false;
+                updateBtn.innerHTML = '<ms>sync</ms>';
+            }
+        });
+
         row.appendChild(infoDiv);
         row.appendChild(teamInput);
         row.appendChild(hrInput);
         row.appendChild(powerInputs);
+        row.appendChild(updateBtn);
         container.appendChild(row);
     }
 }
@@ -1679,6 +1719,7 @@ function renderAthleteMaxList(searchFilter = '') {
         <div class="power-inputs header-power">
             ${POWER_COLUMNS.map(col => `<span class="header-label">${col.label}</span>`).join('')}
         </div>
+        <span class="header-label update-header"></span>
         <span class="header-label delete-header"></span>
     `;
     container.appendChild(headerRow);
@@ -1803,6 +1844,44 @@ function renderAthleteMaxList(searchFilter = '') {
             powerInputs.appendChild(powerInput);
         }
 
+        // Update button (fetch from ZwiftPower)
+        const updateBtn = document.createElement('button');
+        updateBtn.type = 'button';
+        updateBtn.className = 'update-btn';
+        updateBtn.innerHTML = '<ms>sync</ms>';
+        updateBtn.title = 'Update from ZwiftPower';
+        updateBtn.addEventListener('click', async () => {
+            // Get saved credentials
+            const credentials = common.settingsStore.get(ZP_CREDENTIALS_KEY);
+            if (!credentials?.username || !credentials?.password) {
+                alert('Please save your ZwiftPower credentials in the ZwiftPower tab first.');
+                return;
+            }
+
+            // Check if server is running
+            const serverRunning = await checkZpServer();
+            if (!serverRunning) {
+                alert('ZwiftPower fetch server is not running.\n\nStart it with: node zp-fetch.mjs --server');
+                return;
+            }
+
+            // Show loading state
+            updateBtn.disabled = true;
+            updateBtn.innerHTML = '<span class="spinner-inline"></span>';
+
+            try {
+                const profile = await fetchFromServer(athleteId, credentials);
+                displayZpProfile(profile);
+                // Re-render the list to show updated values
+                renderAthleteMaxListWithCurrentSearch();
+            } catch (error) {
+                alert(`Failed to update: ${error.message}`);
+            } finally {
+                updateBtn.disabled = false;
+                updateBtn.innerHTML = '<ms>sync</ms>';
+            }
+        });
+
         // Delete button
         const deleteBtn = document.createElement('button');
         deleteBtn.type = 'button';
@@ -1829,6 +1908,7 @@ function renderAthleteMaxList(searchFilter = '') {
         row.appendChild(teamInput);
         row.appendChild(hrInput);
         row.appendChild(powerInputs);
+        row.appendChild(updateBtn);
         row.appendChild(deleteBtn);
         container.appendChild(row);
     }
