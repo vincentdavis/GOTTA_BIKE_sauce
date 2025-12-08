@@ -604,6 +604,9 @@ export async function settingsMain() {
     await common.initSettingsForm('form#draft-columns')();
     await common.initSettingsForm('form#filter-options')();
 
+    // Resize window to fit content (850x600 is good for Known Athletes table)
+    window.resizeTo(850, 600);
+
     loadStoredMaxHRData();
     loadStoredMaxPowerData();
     renderAthleteMaxList();

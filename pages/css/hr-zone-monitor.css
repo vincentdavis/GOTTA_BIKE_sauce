@@ -242,6 +242,17 @@ html.solid-background body {
     max-height: none;
 }
 
+/* Known Athletes and Event Viewer tabs - allow horizontal scroll for wide content */
+#athletes-tab,
+#events-tab {
+    overflow-x: auto;
+}
+
+#athletes-tab #stored-athletes-list,
+#events-tab #entrants-list {
+    min-width: 700px;
+}
+
 /* Settings page styles */
 .settings-page #settings {
     padding: 15px;
