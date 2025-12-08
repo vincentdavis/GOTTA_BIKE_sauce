@@ -51,7 +51,7 @@ common.settingsStore.setDefault({
     showTeamColumn: true,
     // Nearby athletes filter settings
     refreshInterval: 2,            // Refresh interval in seconds
-    maxGap: 30,                    // Max gap in seconds to show riders
+    maxGap: 60,                    // Max gap in seconds to show riders
     filterSameCategory: false,     // Only show riders in same event category
     filterMarked: false            // Only show marked/followed riders
 });
@@ -61,23 +61,51 @@ const MAX_HR_STORAGE_KEY = '/hr-zone-monitor-max-hr-data';
 // Max power storage key (tracks observed max 30s and 1min power per athlete)
 const MAX_POWER_STORAGE_KEY = '/hr-zone-monitor-max-power-data';
 
-// HR Zone definitions (% of max HR)
+// Default zone colors
+const DEFAULT_ZONE_COLORS = {
+    zone1: '#888888',
+    zone2: '#2196F3',
+    zone3: '#4CAF50',
+    zone4: '#FFEB3B',
+    zone5: '#F44336'
+};
+
+// HR Zone definitions (% of max HR) - colors will be updated from settings
 const HR_ZONES = [
-    { min: 0,   max: 60,  color: '#888888', name: 'Zone 1 (Recovery)' },
-    { min: 60,  max: 70,  color: '#2196F3', name: 'Zone 2 (Endurance)' },
-    { min: 70,  max: 80,  color: '#4CAF50', name: 'Zone 3 (Tempo)' },
-    { min: 80,  max: 90,  color: '#FFEB3B', name: 'Zone 4 (Threshold)' },
-    { min: 90,  max: 999, color: '#F44336', name: 'Zone 5 (VO2 Max)' }
+    { min: 0,   max: 60,  color: DEFAULT_ZONE_COLORS.zone1, name: 'Zone 1 (Recovery)' },
+    { min: 60,  max: 70,  color: DEFAULT_ZONE_COLORS.zone2, name: 'Zone 2 (Endurance)' },
+    { min: 70,  max: 80,  color: DEFAULT_ZONE_COLORS.zone3, name: 'Zone 3 (Tempo)' },
+    { min: 80,  max: 90,  color: DEFAULT_ZONE_COLORS.zone4, name: 'Zone 4 (Threshold)' },
+    { min: 90,  max: 999, color: DEFAULT_ZONE_COLORS.zone5, name: 'Zone 5 (VO2 Max)' }
 ];
 
-// Power Zone definitions (% of max observed power) - matches HR zones
+// Power Zone definitions (% of max observed power) - colors will be updated from settings
 const POWER_ZONES = [
-    { min: 0,   max: 60,  color: '#888888', name: 'Zone 1 (Recovery)' },
-    { min: 60,  max: 70,  color: '#2196F3', name: 'Zone 2 (Endurance)' },
-    { min: 70,  max: 80,  color: '#4CAF50', name: 'Zone 3 (Tempo)' },
-    { min: 80,  max: 90,  color: '#FFEB3B', name: 'Zone 4 (Threshold)' },
-    { min: 90,  max: 999, color: '#F44336', name: 'Zone 5 (VO2 Max)' }
+    { min: 0,   max: 60,  color: DEFAULT_ZONE_COLORS.zone1, name: 'Zone 1 (Recovery)' },
+    { min: 60,  max: 70,  color: DEFAULT_ZONE_COLORS.zone2, name: 'Zone 2 (Endurance)' },
+    { min: 70,  max: 80,  color: DEFAULT_ZONE_COLORS.zone3, name: 'Zone 3 (Tempo)' },
+    { min: 80,  max: 90,  color: DEFAULT_ZONE_COLORS.zone4, name: 'Zone 4 (Threshold)' },
+    { min: 90,  max: 999, color: DEFAULT_ZONE_COLORS.zone5, name: 'Zone 5 (VO2 Max)' }
 ];
+
+// Load zone colors from settings
+function loadZoneColors() {
+    const settings = common.settingsStore.get();
+
+    // Update HR zone colors
+    HR_ZONES[0].color = settings.hrZone1Color || DEFAULT_ZONE_COLORS.zone1;
+    HR_ZONES[1].color = settings.hrZone2Color || DEFAULT_ZONE_COLORS.zone2;
+    HR_ZONES[2].color = settings.hrZone3Color || DEFAULT_ZONE_COLORS.zone3;
+    HR_ZONES[3].color = settings.hrZone4Color || DEFAULT_ZONE_COLORS.zone4;
+    HR_ZONES[4].color = settings.hrZone5Color || DEFAULT_ZONE_COLORS.zone5;
+
+    // Update Power zone colors
+    POWER_ZONES[0].color = settings.powerZone1Color || DEFAULT_ZONE_COLORS.zone1;
+    POWER_ZONES[1].color = settings.powerZone2Color || DEFAULT_ZONE_COLORS.zone2;
+    POWER_ZONES[2].color = settings.powerZone3Color || DEFAULT_ZONE_COLORS.zone3;
+    POWER_ZONES[3].color = settings.powerZone4Color || DEFAULT_ZONE_COLORS.zone4;
+    POWER_ZONES[4].color = settings.powerZone5Color || DEFAULT_ZONE_COLORS.zone5;
+}
 
 let nearbyData;  // Flat array of nearby athletes
 let storedMaxHRData = {};  // Persisted: { athleteId: maxHR, name_athleteId: "Name" }
@@ -114,6 +142,7 @@ export async function main() {
     common.initInteractionListeners();
     loadStoredMaxHRData();
     loadStoredMaxPowerData();
+    loadZoneColors();
 
     doc.style.setProperty('--font-scale', common.settingsStore.get('fontScale') || 1);
     applyBackground();
@@ -143,6 +172,14 @@ export async function main() {
         }
         if (changed.has('backgroundOption') || changed.has('customBackgroundColor')) {
             applyBackground();
+        }
+        // Reload zone colors if any zone color setting changed
+        const zoneColorKeys = [
+            'hrZone1Color', 'hrZone2Color', 'hrZone3Color', 'hrZone4Color', 'hrZone5Color',
+            'powerZone1Color', 'powerZone2Color', 'powerZone3Color', 'powerZone4Color', 'powerZone5Color'
+        ];
+        if (zoneColorKeys.some(key => changed.has(key))) {
+            loadZoneColors();
         }
         renderRiders();
     });
@@ -287,7 +324,7 @@ function truncateName(name, maxLen) {
 }
 
 function applyFilters(riders, settings, watchingAthlete) {
-    const maxGap = settings.maxGap || 30;  // Default 30 seconds
+    const maxGap = settings.maxGap || 60;  // Default 60 seconds
     const filterSameCategory = settings.filterSameCategory || false;
     const filterMarked = settings.filterMarked || false;
 
@@ -603,6 +640,8 @@ export async function settingsMain() {
     await common.initSettingsForm('form#power-columns')();
     await common.initSettingsForm('form#draft-columns')();
     await common.initSettingsForm('form#filter-options')();
+    await common.initSettingsForm('form#hr-zone-colors')();
+    await common.initSettingsForm('form#power-zone-colors')();
 
     // Resize window to fit content (850x600 is good for Known Athletes table)
     window.resizeTo(850, 600);
@@ -615,6 +654,8 @@ export async function settingsMain() {
     setupTabNavigation();
     setupEventViewer();
     setupZwiftPowerTab();
+    setupZoneColorPreviews();
+    setupZoneColorResetButtons();
 
     // Add rider button handler
     const addBtn = document.getElementById('add-rider-btn');
@@ -1360,6 +1401,87 @@ async function fetchFromServer(athleteId, credentials) {
         athleteId: data.athleteId,
         data: data.data || []
     };
+}
+
+/**
+ * Setup zone color preview boxes to match current colors
+ */
+function setupZoneColorPreviews() {
+    const settings = common.settingsStore.get();
+
+    // Update HR zone previews
+    for (let i = 1; i <= 5; i++) {
+        const preview = document.getElementById(`hr-zone${i}-preview`);
+        const input = document.querySelector(`input[name="hrZone${i}Color"]`);
+        if (preview && input) {
+            const color = settings[`hrZone${i}Color`] || DEFAULT_ZONE_COLORS[`zone${i}`];
+            preview.style.backgroundColor = color;
+            input.value = color;
+            // Update preview when color changes
+            input.addEventListener('input', () => {
+                preview.style.backgroundColor = input.value;
+            });
+        }
+    }
+
+    // Update Power zone previews
+    for (let i = 1; i <= 5; i++) {
+        const preview = document.getElementById(`power-zone${i}-preview`);
+        const input = document.querySelector(`input[name="powerZone${i}Color"]`);
+        if (preview && input) {
+            const color = settings[`powerZone${i}Color`] || DEFAULT_ZONE_COLORS[`zone${i}`];
+            preview.style.backgroundColor = color;
+            input.value = color;
+            // Update preview when color changes
+            input.addEventListener('input', () => {
+                preview.style.backgroundColor = input.value;
+            });
+        }
+    }
+}
+
+/**
+ * Setup reset buttons for zone colors
+ */
+function setupZoneColorResetButtons() {
+    const resetHrBtn = document.getElementById('reset-hr-colors');
+    const resetPowerBtn = document.getElementById('reset-power-colors');
+
+    if (resetHrBtn) {
+        resetHrBtn.addEventListener('click', () => {
+            for (let i = 1; i <= 5; i++) {
+                const input = document.querySelector(`input[name="hrZone${i}Color"]`);
+                const preview = document.getElementById(`hr-zone${i}-preview`);
+                const defaultColor = DEFAULT_ZONE_COLORS[`zone${i}`];
+                if (input) {
+                    input.value = defaultColor;
+                    // Trigger change event to save to settings
+                    input.dispatchEvent(new Event('change', { bubbles: true }));
+                }
+                if (preview) {
+                    preview.style.backgroundColor = defaultColor;
+                }
+            }
+        });
+    }
+
+    if (resetPowerBtn) {
+        resetPowerBtn.addEventListener('click', () => {
+            for (let i = 1; i <= 5; i++) {
+                const input = document.querySelector(`input[name="powerZone${i}Color"]`);
+                const preview = document.getElementById(`power-zone${i}-preview`);
+                const defaultColor = DEFAULT_ZONE_COLORS[`zone${i}`];
+                if (input) {
+                    input.value = defaultColor;
+                    // Trigger change event to save to settings
+                    input.dispatchEvent(new Event('change', { bubbles: true }));
+                }
+                if (preview) {
+                    preview.style.backgroundColor = defaultColor;
+                }
+            }
+        });
+    }
 }
 
 /**

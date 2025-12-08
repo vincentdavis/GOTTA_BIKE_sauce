@@ -290,6 +290,67 @@ html.solid-background body {
     color: white;
 }
 
+/* Zone color settings */
+.zone-color-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin: 10px 0;
+}
+
+.zone-color-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 4px 0;
+}
+
+.zone-color-row .zone-label {
+    min-width: 120px;
+    font-size: 0.9em;
+}
+
+.zone-color-row input[type="color"] {
+    width: 40px;
+    height: 28px;
+    padding: 0;
+    border: 1px solid #555;
+    border-radius: 4px;
+    cursor: pointer;
+    background: transparent;
+}
+
+.zone-color-row input[type="color"]::-webkit-color-swatch-wrapper {
+    padding: 2px;
+}
+
+.zone-color-row input[type="color"]::-webkit-color-swatch {
+    border-radius: 2px;
+    border: none;
+}
+
+.zone-preview {
+    width: 60px;
+    height: 24px;
+    border-radius: 4px;
+    display: inline-block;
+}
+
+.reset-colors-btn {
+    margin-top: 10px;
+    padding: 6px 12px;
+    background: #555;
+    border: none;
+    border-radius: 4px;
+    color: #fff;
+    font-size: 0.85em;
+    cursor: pointer;
+}
+
+.reset-colors-btn:hover {
+    background: #666;
+}
+
 /* Rider configuration list */
 #rider-list {
     max-height: 300px;
