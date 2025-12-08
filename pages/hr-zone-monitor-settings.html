@@ -32,8 +32,9 @@
 
         <div class="tab-navigation">
             <button type="button" class="tab-btn active" data-tab="settings-tab">Settings</button>
-            <button type="button" class="tab-btn" data-tab="events-tab">Event Viewer</button>
+            <button type="button" class="tab-btn" data-tab="athletes-tab">Known Athletes</button>
             <button type="button" class="tab-btn" data-tab="zwiftpower-tab">ZwiftPower</button>
+            <button type="button" class="tab-btn" data-tab="events-tab">Event Viewer</button>
             <button type="button" class="tab-btn" data-tab="help-tab">Help</button>
         </div>
 
@@ -173,24 +174,33 @@
                 </div>
             </div>
 
-            <div class="section">
-                <div class="title">Stored Athlete Max Values</div>
-                <p style="color: #888; font-size: 0.85em; margin-bottom: 10px;">
-                    Max values are automatically tracked during rides. Click values to edit. Only used when mode is "Stored".
-                </p>
-                <div class="athlete-search-bar">
-                    <input type="text" id="athlete-search" placeholder="Search by name, team, or ID..."/>
-                </div>
-                <div id="athlete-max-list"></div>
-                <div class="add-rider-form">
-                    <input type="text" id="new-rider-name" placeholder="Name (optional)"/>
-                    <input type="number" id="new-rider-id" placeholder="Athlete ID" min="1"/>
-                    <input type="number" id="new-rider-maxhr" placeholder="Max HR" min="100" max="250"/>
-                    <button type="button" id="add-rider-btn">Add</button>
-                </div>
-            </div>
         </div>
         </div><!-- end #settings-tab -->
+
+        <div id="athletes-tab" class="tab-panel">
+            <div class="athletes-content">
+                <div class="section">
+                    <div class="title">Known Athletes</div>
+                    <p class="hint">
+                        Max values are automatically tracked during rides and from ZwiftPower imports. Click values to edit.
+                    </p>
+                    <div class="athlete-search-bar">
+                        <input type="text" id="athlete-search" placeholder="Search by name, team, or ID..."/>
+                    </div>
+                    <div id="athlete-max-list"></div>
+                </div>
+
+                <div class="section">
+                    <div class="title">Add Athlete Manually</div>
+                    <div class="add-rider-form">
+                        <input type="text" id="new-rider-name" placeholder="Name (optional)"/>
+                        <input type="number" id="new-rider-id" placeholder="Athlete ID" min="1"/>
+                        <input type="number" id="new-rider-maxhr" placeholder="Max HR" min="100" max="250"/>
+                        <button type="button" id="add-rider-btn">Add</button>
+                    </div>
+                </div>
+            </div>
+        </div><!-- end #athletes-tab -->
 
         <div id="events-tab" class="tab-panel">
             <div id="event-viewer-content">
