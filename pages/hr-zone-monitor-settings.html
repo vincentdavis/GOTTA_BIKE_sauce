@@ -33,6 +33,7 @@
         <div class="tab-navigation">
             <button type="button" class="tab-btn active" data-tab="settings-tab">Settings</button>
             <button type="button" class="tab-btn" data-tab="events-tab">Event Viewer</button>
+            <button type="button" class="tab-btn" data-tab="zwiftpower-tab">ZwiftPower</button>
             <button type="button" class="tab-btn" data-tab="help-tab">Help</button>
         </div>
 
@@ -244,6 +245,81 @@
                 <div id="error-message" hidden></div>
             </div>
         </div><!-- end #events-tab -->
+
+        <div id="zwiftpower-tab" class="tab-panel">
+            <div class="zwiftpower-content">
+                <div class="section">
+                    <div class="title">ZwiftPower Login</div>
+                    <p class="hint">Enter your Zwift credentials to fetch athlete data.</p>
+                    <div class="zp-credentials">
+                        <div class="zp-credential-row">
+                            <label for="zp-username">Username:</label>
+                            <input type="email" id="zp-username" placeholder="your@email.com" autocomplete="username"/>
+                        </div>
+                        <div class="zp-credential-row">
+                            <label for="zp-password">Password:</label>
+                            <input type="password" id="zp-password" placeholder="password" autocomplete="current-password"/>
+                        </div>
+                        <div class="zp-credentials-actions">
+                            <button type="button" id="zp-save-credentials">Save</button>
+                            <span id="zp-credentials-status"></span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="section">
+                    <div class="title">Fetch Athlete Data <span id="zp-server-status" class="zp-server-status offline">○ Server not running</span></div>
+                    <p class="hint">Enter an athlete ID to fetch their ZwiftPower profile.</p>
+                    <div class="zp-fetch-section">
+                        <input type="number" id="zp-fetch-athlete-id" placeholder="Athlete ID" min="1"/>
+                        <button type="button" id="zp-fetch-btn">Fetch & Import</button>
+                    </div>
+                    <div id="zp-fetch-status" class="zp-fetch-status"></div>
+                </div>
+
+                <div class="section">
+                    <div class="title">Manual Import</div>
+                    <p class="hint">Or import a previously downloaded JSON file.</p>
+                    <div class="zp-import-section">
+                        <label class="zp-file-label">
+                            <input type="file" id="zp-file-input" accept=".json,application/json"/>
+                            <span class="zp-file-btn">Choose JSON File</span>
+                        </label>
+                        <span id="zp-file-name"></span>
+                    </div>
+                    <div class="zp-lookup-section">
+                        <input type="number" id="zp-athlete-id" placeholder="Athlete ID" min="1"/>
+                        <button type="button" id="zp-import-file-btn">Import</button>
+                    </div>
+                    <div id="zp-lookup-loading" hidden>
+                        <div class="spinner"></div>
+                        <span>Processing...</span>
+                    </div>
+                    <div id="zp-lookup-error" hidden></div>
+                </div>
+
+                <div class="section" id="zp-profile-section" hidden>
+                    <div class="title">Profile Data</div>
+                    <div id="zp-profile-display"></div>
+                </div>
+
+                <div class="section">
+                    <div class="title">Start Fetch Server</div>
+                    <div class="zp-info">
+                        <p>Run this command in a terminal to enable fetching:</p>
+                        <pre class="zp-code">cd /path/to/mod/scripts && node zp-fetch.mjs --server</pre>
+                        <p class="hint">The status indicator above will turn green when connected.</p>
+                    </div>
+                </div>
+
+                <div class="section">
+                    <div class="title">About ZwiftPower Data</div>
+                    <div class="zp-info">
+                        <p>The import extracts <strong>best power values from the last 60 days</strong> and <strong>average of top 3 max heart rates</strong>.</p>
+                    </div>
+                </div>
+            </div>
+        </div><!-- end #zwiftpower-tab -->
 
         <div id="help-tab" class="tab-panel">
             <div class="help-content">

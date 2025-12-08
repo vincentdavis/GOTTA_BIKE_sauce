@@ -6,7 +6,11 @@
       "Bash(npm run build:*)",
       "Bash(npm install:*)",
       "Bash(node --check:*)",
-      "Bash(node -e:*)"
+      "Bash(node -e:*)",
+      "Bash(grep:*)",
+      "Bash(cat:*)",
+      "Bash(node zp-fetch.mjs:*)",
+      "WebFetch(domain:zwiftpower.com)"
     ],
     "additionalDirectories": [
       "/Users/vincentdavis/DEV/REPO/_ZWIFT/Zenmaster-s4z-mods-main",

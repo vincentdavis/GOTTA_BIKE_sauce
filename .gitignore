@@ -5,3 +5,10 @@ node_modules
 dist
 build
 .cache
+
+# Credentials - never commit!
+.env
+scripts/.env
+
+# ZwiftPower profile downloads
+scripts/zp-profiles/
