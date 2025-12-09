@@ -61,6 +61,8 @@ common.settingsStore.setDefault({
 const MAX_HR_STORAGE_KEY = '/hr-zone-monitor-max-hr-data';
 // Max power storage key (tracks observed max 30s and 1min power per athlete)
 const MAX_POWER_STORAGE_KEY = '/hr-zone-monitor-max-power-data';
+// Comprehensive athlete data storage key (stores all fields from GOTTA.BIKE API)
+const ATHLETE_DATA_KEY = '/hr-zone-monitor-athlete-data';
 
 // Default zone colors
 const DEFAULT_ZONE_COLORS = {
@@ -111,6 +113,7 @@ function loadZoneColors() {
 let nearbyData;  // Flat array of nearby athletes
 let storedMaxHRData = {};  // Persisted: { athleteId: maxHR, name_athleteId: "Name" }
 let storedMaxPowerData = {};  // Persisted: { athleteId_5s: maxPower, athleteId_15s: maxPower, ... }
+let storedAthleteData = {};  // Persisted: { athleteId: { ...all GOTTA.BIKE API fields } }
 let sessionMaxHRData = {};  // Session-only: { athleteId: maxHR }
 let sessionMaxPowerData = {};  // Session-only: { athleteId_5s: maxPower, ... }
 let dialogAthleteId = null;
@@ -143,6 +146,7 @@ export async function main() {
     common.initInteractionListeners();
     loadStoredMaxHRData();
     loadStoredMaxPowerData();
+    loadStoredAthleteData();
     loadZoneColors();
 
     doc.style.setProperty('--font-scale', common.settingsStore.get('fontScale') || 1);
@@ -212,6 +216,149 @@ function loadStoredMaxPowerData() {
 
 function saveStoredMaxPowerData() {
     common.settingsStore.set(MAX_POWER_STORAGE_KEY, storedMaxPowerData);
+}
+
+function loadStoredAthleteData() {
+    storedAthleteData = common.settingsStore.get(ATHLETE_DATA_KEY) || {};
+}
+
+function saveStoredAthleteData() {
+    common.settingsStore.set(ATHLETE_DATA_KEY, storedAthleteData);
+}
+
+/**
+ * Get stored athlete data for a specific athlete
+ */
+function getStoredAthleteData(athleteId) {
+    return storedAthleteData[athleteId] || null;
+}
+
+/**
+ * Import athlete data from GOTTA.BIKE API response
+ * Maps API fields to storage and updates backward-compatible structures
+ */
+function importGottaAthleteData(riderData) {
+    if (!riderData || !riderData.riderId) return null;
+
+    const athleteId = riderData.riderId;
+
+    // Get existing data to preserve HR (not provided by API)
+    const existingData = storedAthleteData[athleteId] || {};
+    const existingHR = storedMaxHRData[athleteId];
+
+    // Store all API fields
+    storedAthleteData[athleteId] = {
+        ...riderData,
+        // Preserve existing HR if we have it
+        maxHR: existingHR || existingData.maxHR || null,
+        // Add import timestamp
+        importedAt: Date.now()
+    };
+
+    // Update backward-compatible structures
+
+    // Update storedMaxHRData with name/team
+    if (riderData.name) {
+        storedMaxHRData[`name_${athleteId}`] = riderData.name;
+    }
+    // Note: API doesn't provide team, but we could store zpCategory or other fields
+
+    // Map power fields to storedMaxPowerData
+    // API: power_w5, power_w15, power_w60, power_w300, power_w1200
+    const powerMapping = {
+        power_w5: '5s',
+        power_w15: '15s',
+        power_w60: '60s',
+        power_w300: '300s',
+        power_w1200: '1200s'
+    };
+
+    for (const [apiField, storageKey] of Object.entries(powerMapping)) {
+        const value = riderData[apiField];
+        if (value && value > 0) {
+            storedMaxPowerData[`${athleteId}_${storageKey}`] = Math.round(value);
+        }
+    }
+
+    return storedAthleteData[athleteId];
+}
+
+/**
+ * Bulk import athletes from GOTTA.BIKE API
+ * @param {number[]} athleteIds - Array of athlete IDs to import
+ * @param {function} onProgress - Optional callback for progress updates (imported, total)
+ * @returns {Promise<{success: number, failed: number, errors: string[]}>}
+ */
+async function bulkImportFromGotta(athleteIds, onProgress = null) {
+    const authData = common.settingsStore.get(GOTTA_AUTH_KEY);
+    if (!authData?.api_key) {
+        throw new Error('Please authenticate with GOTTA.BIKE first');
+    }
+
+    if (authData.expires_at && Date.now() > authData.expires_at) {
+        throw new Error('API key expired. Please re-authenticate.');
+    }
+
+    const results = {
+        success: 0,
+        failed: 0,
+        errors: []
+    };
+
+    try {
+        const response = await fetch(`${GOTTA_API_URL}/api_v1/zrapp/riders_sauce_mod`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Sauce-API-Key': authData.api_key
+            },
+            body: JSON.stringify({
+                rider_ids: athleteIds
+            })
+        });
+
+        if (!response.ok) {
+            const errorData = await response.json().catch(() => ({}));
+            throw new Error(errorData.message || `API error: ${response.status}`);
+        }
+
+        const data = await response.json();
+        const riders = data.riders || [];
+
+        // Import each rider
+        for (let i = 0; i < riders.length; i++) {
+            try {
+                importGottaAthleteData(riders[i]);
+                results.success++;
+            } catch (err) {
+                results.failed++;
+                results.errors.push(`${riders[i].riderId}: ${err.message}`);
+            }
+
+            if (onProgress) {
+                onProgress(i + 1, riders.length);
+            }
+        }
+
+        // Count athletes not found in response
+        const returnedIds = new Set(riders.map(r => r.riderId));
+        for (const id of athleteIds) {
+            if (!returnedIds.has(id)) {
+                results.failed++;
+                results.errors.push(`${id}: Not found in database`);
+            }
+        }
+
+        // Save all data
+        saveStoredAthleteData();
+        saveStoredMaxPowerData();
+        saveStoredMaxHRData();
+
+    } catch (error) {
+        throw error;
+    }
+
+    return results;
 }
 
 function updateMaxPower(athleteId, powerValues, name, team) {
@@ -679,6 +826,7 @@ export async function settingsMain() {
 
     loadStoredMaxHRData();
     loadStoredMaxPowerData();
+    loadStoredAthleteData();
     renderAthleteMaxList();
     setupBackgroundOptionToggle();
     setupAthleteSearch();
@@ -687,6 +835,8 @@ export async function settingsMain() {
     setupZwiftPowerTab();
     setupZoneColorPreviews();
     setupZoneColorResetButtons();
+    setupGottaBikeAuth();
+    setupGottaAthleteLookup();
 
     // Add rider button handler
     const addBtn = document.getElementById('add-rider-btn');
@@ -805,6 +955,73 @@ async function setupEventViewer() {
         entrantSearch.addEventListener('input', () => {
             renderEntrants(entrantSearch.value);
         });
+    }
+
+    // Bulk import from GOTTA.BIKE button
+    const bulkImportBtn = document.getElementById('gotta-bulk-import-btn');
+    if (bulkImportBtn) {
+        bulkImportBtn.addEventListener('click', async () => {
+            if (!currentEntrants || currentEntrants.length === 0) {
+                setGottaBulkImportStatus('error', 'No entrants to import');
+                return;
+            }
+
+            // Get all athlete IDs
+            const athleteIds = currentEntrants
+                .map(e => e.id || e.athleteId)
+                .filter(id => id && id > 0);
+
+            if (athleteIds.length === 0) {
+                setGottaBulkImportStatus('error', 'No valid athlete IDs found');
+                return;
+            }
+
+            // Disable button and show progress
+            bulkImportBtn.disabled = true;
+            bulkImportBtn.textContent = 'Importing...';
+            setGottaBulkImportStatus('loading', `Importing ${athleteIds.length} athletes...`);
+
+            try {
+                const results = await bulkImportFromGotta(athleteIds, (current, total) => {
+                    setGottaBulkImportStatus('loading', `Importing ${current} of ${total}...`);
+                });
+
+                if (results.success > 0) {
+                    let message = `Imported ${results.success} athletes`;
+                    if (results.failed > 0) {
+                        message += `, ${results.failed} not found`;
+                    }
+                    setGottaBulkImportStatus('success', message);
+
+                    // Re-render entrants to show updated data
+                    renderEntrants(entrantSearch?.value || '');
+                } else {
+                    setGottaBulkImportStatus('error', 'No athletes found in GOTTA.BIKE database');
+                }
+            } catch (error) {
+                console.error('Bulk import error:', error);
+                setGottaBulkImportStatus('error', error.message);
+            } finally {
+                bulkImportBtn.disabled = false;
+                bulkImportBtn.textContent = 'Import Data';
+            }
+        });
+    }
+}
+
+/**
+ * Set the bulk import status message
+ */
+function setGottaBulkImportStatus(state, message) {
+    const statusDiv = document.getElementById('gotta-bulk-import-status');
+    if (!statusDiv) return;
+
+    statusDiv.className = 'gotta-bulk-import-status ' + state;
+
+    if (state === 'loading') {
+        statusDiv.innerHTML = `<span class="spinner-inline"></span> ${message}`;
+    } else {
+        statusDiv.textContent = message;
     }
 }
 
@@ -1270,6 +1487,10 @@ let selectedZpFile = null;
 // Storage key for ZwiftPower credentials
 const ZP_CREDENTIALS_KEY = '/hr-zone-monitor-zp-credentials';
 const ZP_SERVER_URL = 'http://127.0.0.1:5050';
+
+// Storage key for GOTTA.BIKE authentication
+const GOTTA_AUTH_KEY = '/hr-zone-monitor-gotta-auth';
+const GOTTA_API_URL = 'https://app.gotta.bike';
 
 /**
  * Setup ZwiftPower credentials handlers
@@ -1801,6 +2022,408 @@ function renderAthleteMaxListWithCurrentSearch() {
     renderAthleteMaxList(currentFilter);
 }
 
+// ============================================================================
+// GOTTA.BIKE Authentication
+// ============================================================================
+
+/**
+ * Setup GOTTA.BIKE authentication handlers
+ */
+function setupGottaBikeAuth() {
+    const usernameInput = document.getElementById('gotta-username');
+    const passwordInput = document.getElementById('gotta-password');
+    const authBtn = document.getElementById('gotta-auth-btn');
+    const statusSpan = document.getElementById('gotta-auth-status');
+    const authInfoDiv = document.getElementById('gotta-auth-info');
+
+    if (!usernameInput || !passwordInput || !authBtn) return;
+
+    // Check if we already have saved auth data
+    const savedAuth = common.settingsStore.get(GOTTA_AUTH_KEY);
+
+    // Load saved username
+    if (savedAuth?.username && usernameInput) {
+        usernameInput.value = savedAuth.username;
+    }
+
+    // Display auth status if we have a valid token
+    if (savedAuth?.api_key) {
+        displayGottaAuthStatus(savedAuth);
+    }
+
+    // Authenticate button handler
+    authBtn.addEventListener('click', async () => {
+        const username = usernameInput.value.trim();
+        const password = passwordInput.value;
+
+        if (!username || !password) {
+            setGottaAuthStatus('error', 'Please enter both email and password');
+            return;
+        }
+
+        // Save username locally (even before auth succeeds)
+        const currentAuth = common.settingsStore.get(GOTTA_AUTH_KEY) || {};
+        currentAuth.username = username;
+        common.settingsStore.set(GOTTA_AUTH_KEY, currentAuth);
+
+        // Show loading state
+        authBtn.disabled = true;
+        authBtn.textContent = 'Authenticating...';
+        setGottaAuthStatus('loading', 'Connecting to GOTTA.BIKE...');
+
+        try {
+            const response = await fetch(`${GOTTA_API_URL}/api_v1/zrapp/sauce_auth`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    username: username,
+                    password: password
+                })
+            });
+
+            const data = await response.json();
+
+            if (data.success && data.api_key) {
+                // Calculate expiration date (30 days from now)
+                const expiresAt = Date.now() + (30 * 24 * 60 * 60 * 1000);
+
+                // Save the auth data
+                const authData = {
+                    api_key: data.api_key,
+                    zwid: data.zwid,
+                    username: username,
+                    authenticated_at: Date.now(),
+                    expires_at: expiresAt
+                };
+                common.settingsStore.set(GOTTA_AUTH_KEY, authData);
+
+                // Clear password field for security
+                passwordInput.value = '';
+
+                setGottaAuthStatus('success', data.message || 'Authentication successful!');
+                displayGottaAuthStatus(authData);
+            } else {
+                setGottaAuthStatus('error', data.message || 'Authentication failed');
+                if (authInfoDiv) {
+                    authInfoDiv.hidden = true;
+                }
+            }
+        } catch (error) {
+            console.error('GOTTA.BIKE auth error:', error);
+            setGottaAuthStatus('error', `Connection failed: ${error.message}`);
+            if (authInfoDiv) {
+                authInfoDiv.hidden = true;
+            }
+        } finally {
+            authBtn.disabled = false;
+            authBtn.textContent = 'Authenticate';
+        }
+    });
+}
+
+/**
+ * Set the authentication status message
+ */
+function setGottaAuthStatus(state, message) {
+    const statusSpan = document.getElementById('gotta-auth-status');
+    if (!statusSpan) return;
+
+    statusSpan.className = 'gotta-auth-status-msg ' + state;
+    statusSpan.textContent = message;
+}
+
+/**
+ * Display authentication info when already authenticated
+ */
+function displayGottaAuthStatus(authData) {
+    const authInfoDiv = document.getElementById('gotta-auth-info');
+    const statusText = document.getElementById('gotta-status-text');
+    const zwidSpan = document.getElementById('gotta-zwid');
+    const expiresSpan = document.getElementById('gotta-expires');
+    const keyPreviewSpan = document.getElementById('gotta-key-preview');
+    const usernameInput = document.getElementById('gotta-username');
+
+    if (!authInfoDiv) return;
+
+    // Show the auth info section
+    authInfoDiv.hidden = false;
+
+    if (statusText) {
+        statusText.textContent = 'Authenticated';
+        statusText.className = 'gotta-value authenticated';
+    }
+
+    if (zwidSpan && authData.zwid) {
+        zwidSpan.textContent = authData.zwid;
+    }
+
+    // Display expiration date
+    if (expiresSpan && authData.expires_at) {
+        const expiresDate = new Date(authData.expires_at);
+        expiresSpan.textContent = expiresDate.toLocaleDateString(undefined, {
+            year: 'numeric',
+            month: 'short',
+            day: 'numeric'
+        });
+
+        // Check if expired
+        if (Date.now() > authData.expires_at) {
+            expiresSpan.textContent += ' (Expired)';
+            expiresSpan.className = 'gotta-value expired';
+            if (statusText) {
+                statusText.textContent = 'Expired';
+                statusText.className = 'gotta-value expired';
+            }
+        }
+    }
+
+    // Display last 6 characters of API key
+    if (keyPreviewSpan && authData.api_key) {
+        const keyLast6 = authData.api_key.slice(-6);
+        keyPreviewSpan.textContent = `...${keyLast6}`;
+    }
+
+    // Pre-fill username if available
+    if (usernameInput && authData.username) {
+        usernameInput.value = authData.username;
+    }
+}
+
+/**
+ * Setup GOTTA.BIKE athlete lookup
+ */
+function setupGottaAthleteLookup() {
+    const athleteIdInput = document.getElementById('gotta-athlete-id');
+    const lookupBtn = document.getElementById('gotta-lookup-btn');
+    const statusDiv = document.getElementById('gotta-lookup-status');
+    const dataDiv = document.getElementById('gotta-athlete-data');
+
+    if (!athleteIdInput || !lookupBtn) return;
+
+    lookupBtn.addEventListener('click', async () => {
+        const athleteId = parseInt(athleteIdInput.value);
+
+        if (!athleteId || athleteId < 1) {
+            setGottaLookupStatus('error', 'Please enter a valid Athlete ID');
+            return;
+        }
+
+        // Get auth data
+        const authData = common.settingsStore.get(GOTTA_AUTH_KEY);
+        if (!authData?.api_key) {
+            setGottaLookupStatus('error', 'Please authenticate first');
+            return;
+        }
+
+        // Check if token is expired
+        if (authData.expires_at && Date.now() > authData.expires_at) {
+            setGottaLookupStatus('error', 'API key expired. Please re-authenticate.');
+            return;
+        }
+
+        // Show loading state
+        lookupBtn.disabled = true;
+        lookupBtn.textContent = 'Looking up...';
+        setGottaLookupStatus('loading', 'Fetching athlete data...');
+        if (dataDiv) dataDiv.hidden = true;
+
+        try {
+            const response = await fetch(`${GOTTA_API_URL}/api_v1/zrapp/riders_sauce_mod`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-Sauce-API-Key': authData.api_key
+                },
+                body: JSON.stringify({
+                    rider_ids: [athleteId]
+                })
+            });
+
+            const data = await response.json();
+
+            if (response.ok && data) {
+                displayGottaAthleteData(athleteId, data);
+                setGottaLookupStatus('success', 'Data retrieved successfully');
+            } else {
+                setGottaLookupStatus('error', data.message || data.error || 'Failed to fetch athlete data');
+            }
+        } catch (error) {
+            console.error('GOTTA.BIKE lookup error:', error);
+            setGottaLookupStatus('error', `Connection failed: ${error.message}`);
+        } finally {
+            lookupBtn.disabled = false;
+            lookupBtn.textContent = 'Lookup';
+        }
+    });
+}
+
+/**
+ * Set the lookup status message
+ */
+function setGottaLookupStatus(state, message) {
+    const statusDiv = document.getElementById('gotta-lookup-status');
+    if (!statusDiv) return;
+
+    statusDiv.className = 'gotta-lookup-status ' + state;
+
+    if (state === 'loading') {
+        statusDiv.innerHTML = `<span class="spinner-inline"></span> ${message}`;
+    } else {
+        statusDiv.textContent = message;
+    }
+}
+
+/**
+ * Display athlete data from GOTTA.BIKE and import to storage
+ */
+function displayGottaAthleteData(athleteId, data) {
+    const dataDiv = document.getElementById('gotta-athlete-data');
+    if (!dataDiv) return;
+
+    // The API returns { riders: [...] }
+    const riders = data.riders || [];
+    const athlete = riders[0];
+
+    if (!athlete) {
+        dataDiv.innerHTML = '<p class="no-data">No data found for this athlete.</p>';
+        dataDiv.hidden = false;
+        return;
+    }
+
+    // Import the athlete data to storage
+    importGottaAthleteData(athlete);
+    saveStoredAthleteData();
+    saveStoredMaxPowerData();
+    saveStoredMaxHRData();
+
+    // Build display HTML
+    let html = '<div class="gotta-athlete-profile">';
+
+    // Basic info section
+    html += '<div class="gotta-section-title">Basic Info</div>';
+    const basicFields = [
+        { key: 'riderId', label: 'Rider ID' },
+        { key: 'name', label: 'Name' },
+        { key: 'gender', label: 'Gender' },
+        { key: 'country', label: 'Country' },
+        { key: 'height', label: 'Height', suffix: 'cm' },
+        { key: 'weight', label: 'Weight', suffix: 'kg' }
+    ];
+
+    for (const field of basicFields) {
+        const value = athlete[field.key];
+        if (value !== undefined && value !== null && value !== '') {
+            let displayValue = value;
+            if (typeof value === 'number' && field.suffix) {
+                displayValue = `${value.toFixed(1)} ${field.suffix}`;
+            } else if (field.suffix) {
+                displayValue = `${value} ${field.suffix}`;
+            }
+            html += `
+                <div class="gotta-athlete-row">
+                    <span class="gotta-label">${field.label}:</span>
+                    <span class="gotta-value">${displayValue}</span>
+                </div>
+            `;
+        }
+    }
+
+    // ZwiftPower section
+    html += '<div class="gotta-section-title">ZwiftPower Data</div>';
+    const zpFields = [
+        { key: 'zpCategory', label: 'Category' },
+        { key: 'zpFTP', label: 'FTP', suffix: 'W' }
+    ];
+
+    for (const field of zpFields) {
+        const value = athlete[field.key];
+        if (value !== undefined && value !== null && value !== '') {
+            let displayValue = value;
+            if (typeof value === 'number' && field.suffix) {
+                displayValue = `${value.toFixed(0)} ${field.suffix}`;
+            }
+            html += `
+                <div class="gotta-athlete-row">
+                    <span class="gotta-label">${field.label}:</span>
+                    <span class="gotta-value">${displayValue}</span>
+                </div>
+            `;
+        }
+    }
+
+    // Power Model section
+    html += '<div class="gotta-section-title">Power Model</div>';
+    const powerModelFields = [
+        { key: 'power_CP', label: 'Critical Power (CP)', suffix: 'W' },
+        { key: 'power_AWC', label: "W' (AWC)", suffix: 'J' }
+    ];
+
+    for (const field of powerModelFields) {
+        const value = athlete[field.key];
+        if (value !== undefined && value !== null && value !== '' && value > 0) {
+            let displayValue = `${Math.round(value)} ${field.suffix}`;
+            html += `
+                <div class="gotta-athlete-row">
+                    <span class="gotta-label">${field.label}:</span>
+                    <span class="gotta-value">${displayValue}</span>
+                </div>
+            `;
+        }
+    }
+
+    // Power Bests section
+    html += '<div class="gotta-section-title">Power Bests</div>';
+    const powerBestFields = [
+        { key: 'power_w5', label: '5 sec', suffix: 'W' },
+        { key: 'power_w15', label: '15 sec', suffix: 'W' },
+        { key: 'power_w60', label: '1 min', suffix: 'W' },
+        { key: 'power_w300', label: '5 min', suffix: 'W' },
+        { key: 'power_w1200', label: '20 min', suffix: 'W' }
+    ];
+
+    for (const field of powerBestFields) {
+        const value = athlete[field.key];
+        if (value !== undefined && value !== null && value !== '' && value > 0) {
+            let displayValue = `${Math.round(value)} ${field.suffix}`;
+            html += `
+                <div class="gotta-athlete-row">
+                    <span class="gotta-label">${field.label}:</span>
+                    <span class="gotta-value">${displayValue}</span>
+                </div>
+            `;
+        }
+    }
+
+    // Metadata
+    if (athlete.modified) {
+        html += '<div class="gotta-section-title">Metadata</div>';
+        html += `
+            <div class="gotta-athlete-row">
+                <span class="gotta-label">Last Updated:</span>
+                <span class="gotta-value">${athlete.modified}</span>
+            </div>
+        `;
+    }
+
+    html += '</div>';
+
+    // Add import confirmation
+    html += '<div class="gotta-import-status">Data imported to athlete storage</div>';
+
+    // Add raw data viewer
+    html += `
+        <details class="gotta-raw-data">
+            <summary>View Raw Data</summary>
+            <pre>${JSON.stringify(athlete, null, 2)}</pre>
+        </details>
+    `;
+
+    dataDiv.innerHTML = html;
+    dataDiv.hidden = false;
+}
+
 function setupBackgroundOptionToggle() {
     const bgSelect = document.querySelector('select[name="backgroundOption"]');
     const customColorRow = document.querySelector('.custom-color-row');
@@ -1876,6 +2499,7 @@ function renderAthleteMaxList(searchFilter = '') {
             ${POWER_COLUMNS.map(col => `<span class="header-label">${col.label}</span>`).join('')}
         </div>
         <span class="header-label update-header"></span>
+        <span class="header-label expand-header"></span>
         <span class="header-label delete-header"></span>
     `;
     container.appendChild(headerRow);
@@ -2057,7 +2681,38 @@ function renderAthleteMaxList(searchFilter = '') {
             }
             saveStoredMaxPowerData();
 
+            // Delete athlete data
+            delete storedAthleteData[athleteId];
+            saveStoredAthleteData();
+
             renderAthleteMaxList();
+        });
+
+        // Expand button to show all data
+        const expandBtn = document.createElement('button');
+        expandBtn.type = 'button';
+        expandBtn.className = 'expand-btn';
+        expandBtn.innerHTML = '<ms>expand_more</ms>';
+        expandBtn.title = 'Show all data';
+
+        // Create expandable details panel
+        const detailsPanel = document.createElement('div');
+        detailsPanel.className = 'athlete-details-panel';
+        detailsPanel.hidden = true;
+
+        // Check if we have GOTTA.BIKE data
+        const gottaData = storedAthleteData[athleteId];
+        if (gottaData) {
+            detailsPanel.innerHTML = renderAthleteDetailsPanel(athleteId, gottaData);
+        } else {
+            detailsPanel.innerHTML = '<div class="no-gotta-data">No extended data available. Import from GOTTA.BIKE to see additional fields.</div>';
+        }
+
+        expandBtn.addEventListener('click', () => {
+            const isExpanded = !detailsPanel.hidden;
+            detailsPanel.hidden = isExpanded;
+            expandBtn.innerHTML = isExpanded ? '<ms>expand_more</ms>' : '<ms>expand_less</ms>';
+            expandBtn.title = isExpanded ? 'Show all data' : 'Hide details';
         });
 
         row.appendChild(infoDiv);
@@ -2065,7 +2720,138 @@ function renderAthleteMaxList(searchFilter = '') {
         row.appendChild(hrInput);
         row.appendChild(powerInputs);
         row.appendChild(updateBtn);
+        row.appendChild(expandBtn);
         row.appendChild(deleteBtn);
-        container.appendChild(row);
+
+        // Create a wrapper to hold both the row and the details panel
+        const rowWrapper = document.createElement('div');
+        rowWrapper.className = 'athlete-row-wrapper';
+        rowWrapper.appendChild(row);
+        rowWrapper.appendChild(detailsPanel);
+
+        container.appendChild(rowWrapper);
     }
+}
+
+/**
+ * Render the details panel HTML for an athlete
+ */
+function renderAthleteDetailsPanel(athleteId, data) {
+    let html = '<div class="athlete-details-content">';
+
+    // Basic Info
+    html += '<div class="details-section">';
+    html += '<div class="details-section-title">Basic Info</div>';
+    html += '<div class="details-grid">';
+
+    const basicFields = [
+        { key: 'riderId', label: 'Rider ID' },
+        { key: 'name', label: 'Name' },
+        { key: 'gender', label: 'Gender' },
+        { key: 'country', label: 'Country' },
+        { key: 'height', label: 'Height', suffix: 'cm', decimals: 1 },
+        { key: 'weight', label: 'Weight', suffix: 'kg', decimals: 1 }
+    ];
+
+    for (const field of basicFields) {
+        const value = data[field.key];
+        if (value !== undefined && value !== null && value !== '') {
+            let displayValue = value;
+            if (typeof value === 'number' && field.decimals !== undefined) {
+                displayValue = value.toFixed(field.decimals);
+            }
+            if (field.suffix) {
+                displayValue += ` ${field.suffix}`;
+            }
+            html += `<div class="details-item"><span class="details-label">${field.label}:</span><span class="details-value">${displayValue}</span></div>`;
+        }
+    }
+    html += '</div></div>';
+
+    // ZwiftPower Data
+    html += '<div class="details-section">';
+    html += '<div class="details-section-title">ZwiftPower</div>';
+    html += '<div class="details-grid">';
+
+    const zpFields = [
+        { key: 'zpCategory', label: 'Category' },
+        { key: 'zpFTP', label: 'FTP', suffix: 'W', decimals: 0 }
+    ];
+
+    for (const field of zpFields) {
+        const value = data[field.key];
+        if (value !== undefined && value !== null && value !== '') {
+            let displayValue = value;
+            if (typeof value === 'number' && field.decimals !== undefined) {
+                displayValue = value.toFixed(field.decimals);
+            }
+            if (field.suffix) {
+                displayValue += ` ${field.suffix}`;
+            }
+            html += `<div class="details-item"><span class="details-label">${field.label}:</span><span class="details-value">${displayValue}</span></div>`;
+        }
+    }
+    html += '</div></div>';
+
+    // Power Model
+    html += '<div class="details-section">';
+    html += '<div class="details-section-title">Power Model</div>';
+    html += '<div class="details-grid">';
+
+    const powerModelFields = [
+        { key: 'power_CP', label: 'Critical Power', suffix: 'W', decimals: 0 },
+        { key: 'power_AWC', label: "W' (AWC)", suffix: 'J', decimals: 0 }
+    ];
+
+    for (const field of powerModelFields) {
+        const value = data[field.key];
+        if (value !== undefined && value !== null && value > 0) {
+            let displayValue = Math.round(value);
+            if (field.suffix) {
+                displayValue += ` ${field.suffix}`;
+            }
+            html += `<div class="details-item"><span class="details-label">${field.label}:</span><span class="details-value">${displayValue}</span></div>`;
+        }
+    }
+    html += '</div></div>';
+
+    // Power Bests
+    html += '<div class="details-section">';
+    html += '<div class="details-section-title">Power Bests</div>';
+    html += '<div class="details-grid">';
+
+    const powerFields = [
+        { key: 'power_w5', label: '5 sec' },
+        { key: 'power_w15', label: '15 sec' },
+        { key: 'power_w60', label: '1 min' },
+        { key: 'power_w300', label: '5 min' },
+        { key: 'power_w1200', label: '20 min' }
+    ];
+
+    for (const field of powerFields) {
+        const value = data[field.key];
+        if (value !== undefined && value !== null && value > 0) {
+            html += `<div class="details-item"><span class="details-label">${field.label}:</span><span class="details-value">${Math.round(value)} W</span></div>`;
+        }
+    }
+    html += '</div></div>';
+
+    // Metadata
+    if (data.modified || data.importedAt) {
+        html += '<div class="details-section">';
+        html += '<div class="details-section-title">Metadata</div>';
+        html += '<div class="details-grid">';
+
+        if (data.modified) {
+            html += `<div class="details-item"><span class="details-label">Source Updated:</span><span class="details-value">${data.modified}</span></div>`;
+        }
+        if (data.importedAt) {
+            const importDate = new Date(data.importedAt);
+            html += `<div class="details-item"><span class="details-label">Imported:</span><span class="details-value">${importDate.toLocaleDateString()} ${importDate.toLocaleTimeString()}</span></div>`;
+        }
+        html += '</div></div>';
+    }
+
+    html += '</div>';
+    return html;
 }

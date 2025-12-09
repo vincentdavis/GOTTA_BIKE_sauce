@@ -1333,3 +1333,414 @@ html.solid-background body {
     margin: 10px 0;
     overflow-x: auto;
 }
+
+/* GOTTA.BIKE Authentication Styles */
+.zwift-content {
+    padding: 15px;
+}
+
+.gotta-credentials {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    max-width: 300px;
+}
+
+.gotta-credential-row {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.gotta-credential-row label {
+    font-size: 0.9em;
+    color: #aaa;
+}
+
+.gotta-credential-row input {
+    padding: 8px 10px;
+    background: #333;
+    border: 1px solid #555;
+    border-radius: 4px;
+    color: #fff;
+    font-size: 0.95em;
+}
+
+.gotta-credential-row input:focus {
+    outline: none;
+    border-color: #2196F3;
+}
+
+.gotta-credentials-actions {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-top: 5px;
+}
+
+#gotta-auth-btn {
+    padding: 8px 16px;
+    background: #4CAF50;
+    color: #fff;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.9em;
+}
+
+#gotta-auth-btn:hover {
+    background: #45a049;
+}
+
+#gotta-auth-btn:disabled {
+    background: #555;
+    cursor: not-allowed;
+}
+
+.gotta-auth-status-msg {
+    font-size: 0.85em;
+}
+
+.gotta-auth-status-msg.loading {
+    color: #aaa;
+}
+
+.gotta-auth-status-msg.success {
+    color: #8BC34A;
+}
+
+.gotta-auth-status-msg.error {
+    color: #ff6b6b;
+}
+
+/* GOTTA.BIKE Auth Info section */
+.gotta-auth-info {
+    margin-top: 15px;
+    padding: 12px;
+    background: rgba(76, 175, 80, 0.1);
+    border: 1px solid rgba(76, 175, 80, 0.3);
+    border-radius: 4px;
+    max-width: 300px;
+}
+
+.gotta-auth-row {
+    display: flex;
+    padding: 6px 0;
+}
+
+.gotta-auth-row:last-child {
+    border-bottom: none;
+}
+
+.gotta-label {
+    flex: 0 0 100px;
+    color: #999;
+    font-size: 0.9em;
+}
+
+.gotta-value {
+    flex: 1;
+    color: #fff;
+    font-size: 0.9em;
+}
+
+.gotta-value.authenticated {
+    color: #8BC34A;
+    font-weight: 500;
+}
+
+.gotta-value.expired {
+    color: #ff6b6b;
+    font-weight: 500;
+}
+
+/* GOTTA.BIKE Athlete Lookup Styles */
+.gotta-lookup-section {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 10px;
+}
+
+.gotta-lookup-section input[type="number"] {
+    padding: 8px 10px;
+    background: #333;
+    border: 1px solid #555;
+    border-radius: 4px;
+    color: #fff;
+    font-size: 0.95em;
+    width: 150px;
+}
+
+.gotta-lookup-section input[type="number"]:focus {
+    outline: none;
+    border-color: #2196F3;
+}
+
+#gotta-lookup-btn {
+    padding: 8px 16px;
+    background: #2196F3;
+    color: #fff;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.9em;
+}
+
+#gotta-lookup-btn:hover {
+    background: #1976D2;
+}
+
+#gotta-lookup-btn:disabled {
+    background: #555;
+    cursor: not-allowed;
+}
+
+.gotta-lookup-status {
+    font-size: 0.9em;
+    margin-top: 8px;
+    min-height: 1.2em;
+}
+
+.gotta-lookup-status.loading {
+    color: #aaa;
+}
+
+.gotta-lookup-status.success {
+    color: #8BC34A;
+}
+
+.gotta-lookup-status.error {
+    color: #ff6b6b;
+}
+
+/* GOTTA.BIKE Athlete Data Display */
+.gotta-athlete-data {
+    margin-top: 15px;
+    padding: 12px;
+    background: rgba(33, 150, 243, 0.1);
+    border: 1px solid rgba(33, 150, 243, 0.3);
+    border-radius: 4px;
+}
+
+.gotta-athlete-profile {
+    margin-bottom: 10px;
+}
+
+.gotta-athlete-row {
+    display: flex;
+    padding: 6px 0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.gotta-athlete-row:last-child {
+    border-bottom: none;
+}
+
+.gotta-raw-data {
+    margin-top: 10px;
+}
+
+.gotta-raw-data summary {
+    cursor: pointer;
+    color: #888;
+    font-size: 0.9em;
+}
+
+.gotta-raw-data summary:hover {
+    color: #ccc;
+}
+
+.gotta-raw-data pre {
+    margin: 10px 0 0 0;
+    padding: 10px;
+    background: #1a1a1a;
+    border-radius: 4px;
+    overflow-x: auto;
+    font-size: 0.8em;
+    color: #8BC34A;
+    max-height: 300px;
+    overflow-y: auto;
+}
+
+.no-data {
+    color: #888;
+    font-style: italic;
+}
+
+/* GOTTA.BIKE section titles */
+.gotta-section-title {
+    font-size: 0.85em;
+    font-weight: 600;
+    color: #2196F3;
+    margin-top: 12px;
+    margin-bottom: 6px;
+    padding-bottom: 4px;
+    border-bottom: 1px solid rgba(33, 150, 243, 0.3);
+}
+
+.gotta-section-title:first-child {
+    margin-top: 0;
+}
+
+/* GOTTA.BIKE import status */
+.gotta-import-status {
+    margin-top: 12px;
+    padding: 8px 12px;
+    background: rgba(76, 175, 80, 0.15);
+    border: 1px solid rgba(76, 175, 80, 0.3);
+    border-radius: 4px;
+    color: #8BC34A;
+    font-size: 0.9em;
+}
+
+/* Event Viewer bulk import styles */
+.entrants-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+}
+
+.entrants-header h3 {
+    margin: 0;
+}
+
+.gotta-bulk-import-btn {
+    padding: 8px 16px;
+    background: #4CAF50;
+    color: #fff;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.85em;
+    transition: background 0.2s;
+}
+
+.gotta-bulk-import-btn:hover {
+    background: #45a049;
+}
+
+.gotta-bulk-import-btn:disabled {
+    background: #555;
+    cursor: not-allowed;
+}
+
+.gotta-bulk-import-status {
+    font-size: 0.9em;
+    margin-bottom: 10px;
+    min-height: 1.2em;
+}
+
+.gotta-bulk-import-status.loading {
+    color: #aaa;
+}
+
+.gotta-bulk-import-status.success {
+    color: #8BC34A;
+}
+
+.gotta-bulk-import-status.error {
+    color: #ff6b6b;
+}
+
+/* Athlete row wrapper for expand functionality */
+.athlete-row-wrapper {
+    border-bottom: 1px solid #333;
+}
+
+.athlete-row-wrapper:hover {
+    background-color: rgba(255, 255, 255, 0.03);
+}
+
+.athlete-row-wrapper .athlete-max-row {
+    border-bottom: none;
+}
+
+/* Expand button */
+.expand-btn {
+    background: #444;
+    border: none;
+    color: #aaa;
+    padding: 4px 8px;
+    border-radius: 4px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 32px;
+    transition: all 0.2s;
+}
+
+.expand-btn:hover {
+    background: #555;
+    color: #fff;
+}
+
+.expand-btn ms {
+    font-size: 1.2em;
+}
+
+.expand-header {
+    width: 32px;
+}
+
+/* Athlete details panel */
+.athlete-details-panel {
+    padding: 12px 15px;
+    background: rgba(33, 150, 243, 0.05);
+    border-top: 1px solid rgba(33, 150, 243, 0.2);
+    margin-left: 20px;
+}
+
+.athlete-details-panel[hidden] {
+    display: none;
+}
+
+.athlete-details-content {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 20px;
+}
+
+.details-section {
+    min-width: 150px;
+    flex: 1;
+}
+
+.details-section-title {
+    font-size: 0.8em;
+    font-weight: 600;
+    color: #2196F3;
+    margin-bottom: 8px;
+    padding-bottom: 4px;
+    border-bottom: 1px solid rgba(33, 150, 243, 0.3);
+}
+
+.details-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.details-item {
+    display: flex;
+    gap: 8px;
+    font-size: 0.85em;
+}
+
+.details-label {
+    color: #888;
+    min-width: 90px;
+}
+
+.details-value {
+    color: #fff;
+}
+
+.no-gotta-data {
+    color: #888;
+    font-style: italic;
+    font-size: 0.9em;
+    padding: 10px 0;
+}
