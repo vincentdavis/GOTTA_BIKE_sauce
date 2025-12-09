@@ -34,6 +34,7 @@
             <button type="button" class="tab-btn active" data-tab="settings-tab">Settings</button>
             <button type="button" class="tab-btn" data-tab="athletes-tab">Known Athletes</button>
             <button type="button" class="tab-btn" data-tab="zwiftpower-tab">ZwiftPower</button>
+            <button type="button" class="tab-btn" data-tab="zwift-tab">Zwift</button>
             <button type="button" class="tab-btn" data-tab="events-tab">Event Viewer</button>
             <button type="button" class="tab-btn" data-tab="help-tab">Help</button>
         </div>
@@ -132,6 +133,14 @@
 
             <form id="filter-options" class="section">
                 <div class="title">Nearby Athletes</div>
+                <label>
+                    <key>Sort by:</key>
+                    <select name="sortMode">
+                        <option value="position">Position</option>
+                        <option value="name">Name</option>
+                        <option value="team">Team, then Position</option>
+                    </select>
+                </label>
                 <label>
                     <key>Refresh interval:</key>
                     <input type="number" name="refreshInterval" min="1" max="10" step="1" value="2" style="--size: 4"/>
@@ -372,6 +381,15 @@
                 </div>
             </div>
         </div><!-- end #zwiftpower-tab -->
+
+        <div id="zwift-tab" class="tab-panel">
+            <div class="zwift-content">
+                <div class="section">
+                    <div class="title">Zwift</div>
+                    <p class="hint">Zwift-related features and settings.</p>
+                </div>
+            </div>
+        </div><!-- end #zwift-tab -->
 
         <div id="help-tab" class="tab-panel">
             <div class="help-content">

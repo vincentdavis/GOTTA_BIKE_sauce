@@ -50,6 +50,7 @@ common.settingsStore.setDefault({
     // Team column setting
     showTeamColumn: true,
     // Nearby athletes filter settings
+    sortMode: 'position',          // Sort mode: position, name, team
     refreshInterval: 2,            // Refresh interval in seconds
     maxGap: 60,                    // Max gap in seconds to show riders
     filterSameCategory: false,     // Only show riders in same event category
@@ -415,6 +416,35 @@ function showMaxHRDialog(athleteId, name, currentMaxHR) {
     hrInput.select();
 }
 
+function sortRiders(riders, sortMode) {
+    const sorted = [...riders];
+    switch (sortMode) {
+        case 'name':
+            sorted.sort((a, b) => {
+                const nameA = a.athlete?.sanitizedFullname || '';
+                const nameB = b.athlete?.sanitizedFullname || '';
+                return nameA.localeCompare(nameB);
+            });
+            break;
+        case 'team':
+            sorted.sort((a, b) => {
+                const teamA = storedMaxHRData[`team_${a.athleteId}`] || a.athlete?.team || '';
+                const teamB = storedMaxHRData[`team_${b.athleteId}`] || b.athlete?.team || '';
+                // First sort by team name
+                const teamCompare = teamA.localeCompare(teamB);
+                if (teamCompare !== 0) return teamCompare;
+                // Then by position (gap)
+                return (a.gap || 0) - (b.gap || 0);
+            });
+            break;
+        case 'position':
+        default:
+            // Already sorted by position (gap) from the nearby data
+            break;
+    }
+    return sorted;
+}
+
 function renderRiders() {
     if (!nearbyData || !nearbyData.length) return;
 
@@ -427,8 +457,9 @@ function renderRiders() {
     // Find the watching athlete for filter comparisons
     const watchingAthlete = nearbyData.find(a => a.watching);
 
-    // Apply filters and limit riders
+    // Apply filters, sort, and limit riders
     let riders = applyFilters(nearbyData, settings, watchingAthlete);
+    riders = sortRiders(riders, settings.sortMode || 'position');
     riders = riders.slice(0, maxRiders);
 
     for (const athlete of riders) {
