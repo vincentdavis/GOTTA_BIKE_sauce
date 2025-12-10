@@ -4,14 +4,14 @@
     "description": "Display nearby riders with heart rate color-coded by HR zone",
     "author": "Vincent Davis",
     "website_url": "https://gotta.bike",
-    "version": "1.57.0",
+    "version": "1.69.0",
     "content_js": [],
     "content_css": [],
     "web_root": "pages",
     "windows": [
         {
-            "file": "pages/hr-zone-monitor.html",
-            "id": "hr-zone-monitor",
+            "file": "pages/live-stats.html",
+            "id": "live-stats",
             "name": "GOTTA.BIKE sauce",
             "description": "Shows nearby riders with HR zone color coding based on max HR",
             "overlay": true,
@@ -24,15 +24,15 @@
             }
         },
         {
-            "file": "pages/hr-zone-monitor-settings.html",
-            "id": "hr-zone-monitor-settings",
-            "name": "GOTTA.BIKE Settings",
-            "description": "Settings, Known Athletes, GOTTA.BIKE integration, and Event Viewer",
-            "overlay": false,
-            "frame": true,
+            "file": "pages/pre-race.html",
+            "id": "pre-race",
+            "name": "PreRace Heatmap",
+            "description": "Pre-race heatmap showing entrant power data",
+            "overlay": true,
+            "frame": false,
             "default_bounds": {
-                "width": 850,
-                "height": 600,
+                "width": 600,
+                "height": 500,
                 "x": 100,
                 "y": 100
             }

@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html data-settings-key="pre-race-settings-v1">
+<head>
+    <meta charset="utf-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
+    <link rel="stylesheet" href="/pages/css/common.css"/>
+    <link rel="stylesheet" href="./css/pre-race.css"/>
+    <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
+</head>
+<body class="transparent-bg">
+    <div id="titlebar">
+        <header>
+            <div class="logo"><img src="/pages/images/icon128.png"/></div>
+            <div class="title">PreRace Heatmap</div>
+            <div class="filler"></div>
+            <div class="buttons">
+                <a class="button open-settings" href="pre-race-settings.html?width=600&height=700&child-window"
+                   title="Open settings window" target="pre-race-settings"><ms>settings</ms></a>
+                <div title="Close this window" class="button close electron-only"><ms>close</ms></div>
+            </div>
+        </header>
+    </div>
+
+    <div id="content">
+        <div id="event-selector">
+            <div class="input-row">
+                <input type="text" id="event-input" placeholder="Event ID or URL"/>
+                <button type="button" id="load-event-btn">Load</button>
+            </div>
+            <div class="input-row">
+                <select id="cached-events">
+                    <option value="">-- Cached Events --</option>
+                </select>
+            </div>
+            <div class="input-row">
+                <select id="subgroup-select" disabled>
+                    <option value="">-- Select Category --</option>
+                </select>
+            </div>
+        </div>
+
+        <div id="event-info" hidden>
+            <div id="event-name" class="event-name"></div>
+            <div id="event-details">
+                <span id="entrant-count">0</span> entrants
+            </div>
+            <div class="action-row">
+                <button type="button" id="import-btn" disabled>Import Data</button>
+                <span id="import-status"></span>
+            </div>
+        </div>
+
+        <div id="loading" hidden>
+            <div class="spinner"></div>
+            <span>Loading...</span>
+        </div>
+
+        <div id="error" class="error" hidden></div>
+
+        <div id="heatmap-container">
+            <div id="heatmap-chart"></div>
+        </div>
+
+        <div id="no-data" class="no-data" hidden>
+            <p>No power data available.</p>
+            <p>Click "Import Data" to fetch athlete power profiles from GOTTA.BIKE.</p>
+        </div>
+    </div>
+
+    <script type="module">
+        import {preRaceMain} from './src/pre-race.mjs';
+        preRaceMain();
+    </script>
+</body>
+</html>

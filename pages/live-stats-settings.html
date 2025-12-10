@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html class="settings-page" tabindex="0" data-settings-key="hr-zone-monitor-settings-v1">
+<html class="settings-page" tabindex="0" data-settings-key="live-stats-settings-v1">
     <head>
         <meta charset="utf-8"/>
         <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0"/>
@@ -10,12 +10,12 @@
 
         <link id="favicon" rel="shortcut icon" href="/pages/images/favicon.png"/>
         <link rel="stylesheet" href="/pages/css/common.css"/>
-        <link rel="stylesheet" href="./css/hr-zone-monitor.css"/>
+        <link rel="stylesheet" href="./css/live-stats.css"/>
         <link rel="stylesheet" href="./css/event-viewer.css"/>
 
         <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
         <script type="module">
-            import {settingsMain} from './src/hr-zone-monitor.mjs';
+            import {settingsMain} from './src/live-stats.mjs';
             settingsMain();
         </script>
     </head>
@@ -34,7 +34,6 @@
         <div class="tab-navigation">
             <button type="button" class="tab-btn active" data-tab="settings-tab">Settings</button>
             <button type="button" class="tab-btn" data-tab="athletes-tab">Known Athletes</button>
-            <button type="button" class="tab-btn" data-tab="zwift-tab">Zwift</button>
             <button type="button" class="tab-btn" data-tab="events-tab">Event Viewer</button>
             <button type="button" class="tab-btn" data-tab="help-tab">Help</button>
         </div>
@@ -332,57 +331,6 @@
             </div>
         </div><!-- end #events-tab -->
 
-        <div id="zwift-tab" class="tab-panel">
-            <div class="zwift-content">
-                <div class="section">
-                    <div class="title">GOTTA.BIKE Authentication</div>
-                    <p class="hint">Enter your Zwift credentials to authenticate with GOTTA.BIKE and access additional features.</p>
-                    <div class="gotta-credentials">
-                        <div class="gotta-credential-row">
-                            <label for="gotta-username">Zwift Email:</label>
-                            <input type="email" id="gotta-username" placeholder="your@email.com" autocomplete="username"/>
-                        </div>
-                        <div class="gotta-credential-row">
-                            <label for="gotta-password">Zwift Password:</label>
-                            <input type="password" id="gotta-password" placeholder="password" autocomplete="current-password"/>
-                        </div>
-                        <div class="gotta-credentials-actions">
-                            <button type="button" id="gotta-auth-btn">Authenticate</button>
-                            <span id="gotta-auth-status"></span>
-                        </div>
-                    </div>
-                    <div id="gotta-auth-info" class="gotta-auth-info" hidden>
-                        <div class="gotta-auth-row">
-                            <span class="gotta-label">Status:</span>
-                            <span id="gotta-status-text" class="gotta-value">Authenticated</span>
-                        </div>
-                        <div class="gotta-auth-row">
-                            <span class="gotta-label">Zwift ID:</span>
-                            <span id="gotta-zwid" class="gotta-value">-</span>
-                        </div>
-                        <div class="gotta-auth-row">
-                            <span class="gotta-label">Expires:</span>
-                            <span id="gotta-expires" class="gotta-value">-</span>
-                        </div>
-                        <div class="gotta-auth-row">
-                            <span class="gotta-label">API Key:</span>
-                            <span id="gotta-key-preview" class="gotta-value">-</span>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="section">
-                    <div class="title">Lookup Athlete Data</div>
-                    <p class="hint">Enter an athlete ID to fetch their data from GOTTA.BIKE.</p>
-                    <div class="gotta-lookup-section">
-                        <input type="number" id="gotta-athlete-id" placeholder="Athlete ID" min="1"/>
-                        <button type="button" id="gotta-lookup-btn">Lookup</button>
-                    </div>
-                    <div id="gotta-lookup-status" class="gotta-lookup-status"></div>
-                    <div id="gotta-athlete-data" class="gotta-athlete-data" hidden></div>
-                </div>
-            </div>
-        </div><!-- end #zwift-tab -->
 
         <div id="help-tab" class="tab-panel">
             <div class="help-content">

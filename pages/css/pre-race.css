@@ -1,0 +1,516 @@
+/* PreRace Window Styles */
+
+:root {
+    --font-scale: 1;
+    --background-color: #000000;
+}
+
+body {
+    font-size: calc(14px * var(--font-scale));
+    overflow: hidden;
+    margin: 0;
+    height: 100vh;
+}
+
+body.transparent-bg {
+    background: transparent;
+}
+
+body.solid-background {
+    background: var(--background-color);
+}
+
+#content {
+    padding: 0.5em;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5em;
+    height: calc(100vh - 40px);
+    overflow-y: auto;
+    overflow-x: hidden;
+    box-sizing: border-box;
+}
+
+/* Event Selector */
+#event-selector {
+    display: flex;
+    flex-direction: column;
+    gap: 0.3em;
+}
+
+.input-row {
+    display: flex;
+    gap: 0.5em;
+}
+
+.input-row input[type="text"] {
+    flex: 1;
+    padding: 0.3em 0.5em;
+    border: 1px solid #555;
+    border-radius: 3px;
+    background: #333;
+    color: #fff;
+}
+
+.input-row select {
+    flex: 1;
+    padding: 0.3em 0.5em;
+    border: 1px solid #555;
+    border-radius: 3px;
+    background: #333;
+    color: #fff;
+}
+
+.input-row button {
+    padding: 0.3em 1em;
+    border: 1px solid #555;
+    border-radius: 3px;
+    background: #444;
+    color: #fff;
+    cursor: pointer;
+}
+
+.input-row button:hover {
+    background: #555;
+}
+
+/* Event Info */
+#event-info {
+    padding: 0.5em;
+    background: rgba(0, 0, 0, 0.3);
+    border-radius: 4px;
+}
+
+.event-name {
+    font-weight: bold;
+    font-size: 1.1em;
+    margin-bottom: 0.3em;
+}
+
+#event-details {
+    font-size: 0.9em;
+    color: #aaa;
+    margin-bottom: 0.5em;
+}
+
+.action-row {
+    display: flex;
+    align-items: center;
+    gap: 0.5em;
+}
+
+.action-row button {
+    padding: 0.4em 1em;
+    border: 1px solid #555;
+    border-radius: 3px;
+    background: #2a6099;
+    color: #fff;
+    cursor: pointer;
+}
+
+.action-row button:hover:not(:disabled) {
+    background: #3575b8;
+}
+
+.action-row button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+#import-status {
+    font-size: 0.85em;
+    color: #aaa;
+}
+
+#import-status.success {
+    color: #4caf50;
+}
+
+#import-status.error {
+    color: #f44336;
+}
+
+/* Loading */
+#loading {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5em;
+    padding: 2em;
+    color: #aaa;
+}
+
+.spinner {
+    width: 20px;
+    height: 20px;
+    border: 2px solid #555;
+    border-top-color: #fff;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+/* Error */
+.error {
+    padding: 0.5em;
+    background: rgba(244, 67, 54, 0.2);
+    border: 1px solid #f44336;
+    border-radius: 4px;
+    color: #f44336;
+}
+
+/* No Data */
+.no-data {
+    text-align: center;
+    padding: 2em;
+    color: #888;
+}
+
+.no-data p {
+    margin: 0.5em 0;
+}
+
+/* Heatmap Container */
+#heatmap-container {
+    flex: 1;
+    min-height: 200px;
+    overflow: auto;
+}
+
+#heatmap-chart {
+    min-height: 300px;
+}
+
+/* ApexCharts theme overrides for dark mode */
+.apexcharts-tooltip {
+    background: #333 !important;
+    color: #fff !important;
+    border: 1px solid #555 !important;
+}
+
+.apexcharts-tooltip-title {
+    background: #444 !important;
+    border-bottom: 1px solid #555 !important;
+}
+
+.apexcharts-xaxis-label,
+.apexcharts-yaxis-label {
+    fill: #ccc !important;
+}
+
+/* Settings Page Styles */
+
+/* Fixed titlebar for settings */
+body:not(.transparent-bg) #titlebar {
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    background: #1a1a1a;
+}
+
+body:not(.transparent-bg) {
+    overflow-y: auto;
+    overflow-x: hidden;
+}
+
+.settings-content {
+    padding: 1em;
+    box-sizing: border-box;
+}
+
+.settings-section {
+    margin-bottom: 1.5em;
+    padding: 1em;
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 6px;
+}
+
+.settings-section h2 {
+    margin: 0 0 0.8em 0;
+    padding-bottom: 0.3em;
+    border-bottom: 1px solid #555;
+    font-size: 1.1em;
+}
+
+.settings-section h3 {
+    margin: 0.8em 0 0.5em 0;
+    font-size: 0.95em;
+    color: #aaa;
+}
+
+.settings-section form {
+    display: flex;
+    flex-direction: column;
+    gap: 0.6em;
+}
+
+.settings-section label {
+    display: flex;
+    align-items: center;
+    gap: 0.5em;
+}
+
+.settings-section label key {
+    min-width: 140px;
+    color: #ccc;
+}
+
+.settings-section input[type="number"] {
+    width: calc(var(--size, 6) * 1ch + 2em);
+    padding: 0.3em 0.5em;
+    border: 1px solid #555;
+    border-radius: 3px;
+    background: #333;
+    color: #fff;
+}
+
+.settings-section input[type="range"] {
+    flex: 1;
+    max-width: 150px;
+}
+
+.settings-section select {
+    padding: 0.3em 0.5em;
+    border: 1px solid #555;
+    border-radius: 3px;
+    background: #333;
+    color: #fff;
+}
+
+.settings-section input[type="checkbox"] {
+    width: 16px;
+    height: 16px;
+}
+
+.settings-section input[type="color"] {
+    width: 50px;
+    height: 30px;
+    padding: 0;
+    border: 1px solid #555;
+    border-radius: 3px;
+    background: #333;
+    cursor: pointer;
+}
+
+/* Custom color row - hidden by default when not needed */
+.custom-color-row {
+    display: none;
+}
+
+.help-text {
+    font-size: 0.85em;
+    color: #888;
+    margin: 0 0 1em 0;
+}
+
+/* Column Options */
+.column-group {
+    margin-bottom: 1em;
+}
+
+.column-group label {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3em;
+    margin-right: 1em;
+    margin-bottom: 0.3em;
+}
+
+/* Threshold Options */
+.threshold-group {
+    margin-bottom: 1em;
+}
+
+.threshold-row {
+    display: flex;
+    align-items: center;
+    gap: 1em;
+    margin-bottom: 0.5em;
+}
+
+.threshold-label {
+    min-width: 60px;
+    color: #ccc;
+}
+
+.threshold-row label {
+    display: flex;
+    align-items: center;
+    gap: 0.3em;
+    font-size: 0.9em;
+    color: #aaa;
+}
+
+/* Reset Button */
+#reset-thresholds-btn {
+    margin-top: 1em;
+    padding: 0.5em 1em;
+    border: 1px solid #555;
+    border-radius: 3px;
+    background: #444;
+    color: #fff;
+    cursor: pointer;
+}
+
+#reset-thresholds-btn:hover {
+    background: #555;
+}
+
+/* Tab Navigation */
+.tab-navigation {
+    display: flex;
+    background: #252525;
+    border-bottom: 1px solid #444;
+    padding: 0 0.5em;
+    position: sticky;
+    top: 40px;
+    z-index: 99;
+}
+
+.tab-btn {
+    padding: 0.6em 1em;
+    background: transparent;
+    border: none;
+    border-bottom: 2px solid transparent;
+    color: #aaa;
+    cursor: pointer;
+    font-size: 0.9em;
+    transition: all 0.2s;
+}
+
+.tab-btn:hover {
+    color: #fff;
+    background: rgba(255, 255, 255, 0.05);
+}
+
+.tab-btn.active {
+    color: #fff;
+    border-bottom-color: #4caf50;
+}
+
+.tab-panel {
+    display: none;
+}
+
+.tab-panel.active {
+    display: block;
+}
+
+/* Column Picker Styles */
+.column-picker {
+    display: flex;
+    gap: 0.5em;
+    margin-top: 1em;
+}
+
+.column-picker-available,
+.column-picker-selected {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+
+.column-picker h3 {
+    margin: 0 0 0.5em 0;
+    font-size: 0.9em;
+    color: #aaa;
+}
+
+.category-filter {
+    margin-bottom: 0.5em;
+    padding: 0.3em;
+    border: 1px solid #555;
+    border-radius: 3px;
+    background: #333;
+    color: #fff;
+    font-size: 0.85em;
+}
+
+.column-list {
+    flex: 1;
+    min-height: 200px;
+    max-height: 300px;
+    overflow-y: auto;
+    border: 1px solid #555;
+    border-radius: 4px;
+    background: #2a2a2a;
+}
+
+.column-item {
+    padding: 0.4em 0.6em;
+    cursor: pointer;
+    border-bottom: 1px solid #3a3a3a;
+    font-size: 0.85em;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.column-item:last-child {
+    border-bottom: none;
+}
+
+.column-item:hover {
+    background: #3a3a3a;
+}
+
+.column-item.selected {
+    background: #2a5a8a;
+}
+
+.column-item .column-category {
+    font-size: 0.75em;
+    color: #888;
+    margin-left: 0.5em;
+}
+
+.column-picker-buttons {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 0.3em;
+    padding: 0 0.3em;
+}
+
+.column-picker-buttons button {
+    padding: 0.4em 0.6em;
+    border: 1px solid #555;
+    border-radius: 3px;
+    background: #444;
+    color: #fff;
+    cursor: pointer;
+    font-size: 1em;
+    min-width: 32px;
+}
+
+.column-picker-buttons button:hover:not(:disabled) {
+    background: #555;
+}
+
+.column-picker-buttons button:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+.column-picker-actions {
+    margin-top: 1em;
+    display: flex;
+    gap: 0.5em;
+}
+
+.column-picker-actions button {
+    padding: 0.4em 1em;
+    border: 1px solid #555;
+    border-radius: 3px;
+    background: #444;
+    color: #fff;
+    cursor: pointer;
+}
+
+.column-picker-actions button:hover {
+    background: #555;
+}

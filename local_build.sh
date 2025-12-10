@@ -53,6 +53,9 @@ cd "$BUILD_DIR"
 zip -r "${FOLDER_NAME}_${NEW_VERSION}.zip" "$FOLDER_NAME"
 cd "$SCRIPT_DIR"
 
+#Copy mod to user mod folder
+cp -r "$OUTPUT_DIR" ~/Documents/SauceMods/
+
 echo ""
 echo "Build complete!"
 echo "  Folder: $OUTPUT_DIR"

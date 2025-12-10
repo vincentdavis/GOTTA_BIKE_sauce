@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html data-settings-key="pre-race-settings-v1">
+<head>
+    <meta charset="utf-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
+    <link rel="stylesheet" href="/pages/css/common.css"/>
+    <link rel="stylesheet" href="./css/pre-race.css"/>
+    <link rel="stylesheet" href="./css/live-stats.css"/>
+</head>
+<body>
+    <div id="titlebar">
+        <header>
+            <div class="logo"><img src="/pages/images/icon128.png"/></div>
+            <div class="title">PreRace Settings</div>
+            <div class="filler"></div>
+            <div class="buttons">
+                <div title="Close this window" class="button close electron-only"><ms>close</ms></div>
+            </div>
+        </header>
+    </div>
+
+    <div class="tab-navigation">
+        <button type="button" class="tab-btn active" data-tab="settings-tab">Settings</button>
+        <button type="button" class="tab-btn" data-tab="zwift-tab">GOTTA.BIKE</button>
+    </div>
+
+    <div id="settings-tab" class="tab-panel active">
+        <div id="content" class="settings-content">
+            <section class="settings-section">
+                <h2>Display Options</h2>
+                <form id="display-options">
+                    <label>
+                        <key>Font scaling:</key>
+                        <input type="range" name="fontScale" min="0.5" max="2" step="0.1"/>
+                        <input type="number" name="fontScale" min="0.5" max="2" step="0.1" style="--size: 4"/>
+                    </label>
+                    <label>
+                        <key>Max riders to display:</key>
+                        <input type="number" name="maxRiders" min="5" max="200" step="1" style="--size: 5"/>
+                    </label>
+                    <label>
+                        <key>Background:</key>
+                        <select name="backgroundOption">
+                            <option value="black">Black</option>
+                            <option value="transparent">Transparent</option>
+                            <option value="sauce">Sauce Default</option>
+                            <option value="darkGray">Dark Gray</option>
+                            <option value="darkBlue">Dark Blue</option>
+                            <option value="darkGreen">Dark Green</option>
+                            <option value="custom">Custom Color</option>
+                        </select>
+                    </label>
+                    <label class="custom-color-row">
+                        <key>Custom color:</key>
+                        <input type="color" name="customBackgroundColor" value="#232323"/>
+                    </label>
+                </form>
+            </section>
+
+            <section class="settings-section">
+                <h2>Heatmap Columns</h2>
+                <p class="help-text">Select columns to display. Drag to reorder. Colors are based on min/median/max of each column.</p>
+
+                <div class="column-picker">
+                    <div class="column-picker-available">
+                        <h3>Available Columns</h3>
+                        <select id="available-category" class="category-filter">
+                            <option value="">All Categories</option>
+                        </select>
+                        <div id="available-columns" class="column-list"></div>
+                    </div>
+
+                    <div class="column-picker-buttons">
+                        <button type="button" id="add-column-btn" title="Add selected">→</button>
+                        <button type="button" id="remove-column-btn" title="Remove selected">←</button>
+                        <button type="button" id="move-up-btn" title="Move up">↑</button>
+                        <button type="button" id="move-down-btn" title="Move down">↓</button>
+                    </div>
+
+                    <div class="column-picker-selected">
+                        <h3>Selected Columns</h3>
+                        <div id="selected-columns" class="column-list"></div>
+                    </div>
+                </div>
+
+                <div class="column-picker-actions">
+                    <button type="button" id="reset-columns-btn">Reset to Defaults</button>
+                </div>
+            </section>
+
+            <section class="settings-section">
+                <h2>Sorting</h2>
+                <form id="sort-options">
+                    <label>
+                        <key>Default sort column:</key>
+                        <select name="defaultSortColumn" id="sort-column-select">
+                            <!-- Populated dynamically -->
+                        </select>
+                    </label>
+                    <label>
+                        <key>Sort direction:</key>
+                        <select name="defaultSortAscending">
+                            <option value="false">Descending (highest first)</option>
+                            <option value="true">Ascending (lowest first)</option>
+                        </select>
+                    </label>
+                </form>
+            </section>
+        </div>
+    </div><!-- end #settings-tab -->
+
+    <div id="zwift-tab" class="tab-panel">
+        <div class="zwift-content">
+            <div class="section">
+                <div class="title">GOTTA.BIKE Authentication</div>
+                <p class="hint">Enter your Zwift credentials to authenticate with GOTTA.BIKE and access additional features.</p>
+                <div class="gotta-credentials">
+                    <div class="gotta-credential-row">
+                        <label for="gotta-username">Zwift Email:</label>
+                        <input type="email" id="gotta-username" placeholder="your@email.com" autocomplete="username"/>
+                    </div>
+                    <div class="gotta-credential-row">
+                        <label for="gotta-password">Zwift Password:</label>
+                        <input type="password" id="gotta-password" placeholder="password" autocomplete="current-password"/>
+                    </div>
+                    <div class="gotta-credentials-actions">
+                        <button type="button" id="gotta-auth-btn">Authenticate</button>
+                        <span id="gotta-auth-status"></span>
+                    </div>
+                </div>
+                <div id="gotta-auth-info" class="gotta-auth-info" hidden>
+                    <div class="gotta-auth-row">
+                        <span class="gotta-label">Status:</span>
+                        <span id="gotta-status-text" class="gotta-value">Authenticated</span>
+                    </div>
+                    <div class="gotta-auth-row">
+                        <span class="gotta-label">Zwift ID:</span>
+                        <span id="gotta-zwid" class="gotta-value">-</span>
+                    </div>
+                    <div class="gotta-auth-row">
+                        <span class="gotta-label">Expires:</span>
+                        <span id="gotta-expires" class="gotta-value">-</span>
+                    </div>
+                    <div class="gotta-auth-row">
+                        <span class="gotta-label">API Key:</span>
+                        <span id="gotta-key-preview" class="gotta-value">-</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="section">
+                <div class="title">Lookup Athlete Data</div>
+                <p class="hint">Enter an athlete ID to fetch their data from GOTTA.BIKE.</p>
+                <div class="gotta-lookup-section">
+                    <input type="number" id="gotta-athlete-id" placeholder="Athlete ID" min="1"/>
+                    <button type="button" id="gotta-lookup-btn">Lookup</button>
+                </div>
+                <div id="gotta-lookup-status" class="gotta-lookup-status"></div>
+                <div id="gotta-athlete-data" class="gotta-athlete-data" hidden></div>
+            </div>
+        </div>
+    </div><!-- end #zwift-tab -->
+
+    <script type="module">
+        import {preRaceSettingsMain} from './src/pre-race.mjs';
+        preRaceSettingsMain();
+    </script>
+</body>
+</html>

@@ -836,8 +836,6 @@ export async function settingsMain() {
     setupEventViewer();
     setupZoneColorPreviews();
     setupZoneColorResetButtons();
-    setupGottaBikeAuth();
-    setupGottaAthleteLookup();
 
     // Add rider button handler
     const addBtn = document.getElementById('add-rider-btn');
