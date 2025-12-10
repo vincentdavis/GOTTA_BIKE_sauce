@@ -834,7 +834,6 @@ export async function settingsMain() {
     setupAthleteSearch();
     setupTabNavigation();
     setupEventViewer();
-    setupZwiftPowerTab();
     setupZoneColorPreviews();
     setupZoneColorResetButtons();
     setupGottaBikeAuth();
@@ -924,6 +923,9 @@ async function setupEventViewer() {
     // Setup column configuration
     setupColumnConfig();
 
+    // Setup chart controls
+    setupChartControls();
+
     if (loadBtn) {
         loadBtn.addEventListener('click', () => {
             const input = eventInput.value.trim();
@@ -1011,6 +1013,9 @@ async function setupEventViewer() {
 
                     // Re-render entrants to show updated data
                     renderEntrants(entrantSearch?.value || '');
+
+                    // Update chart with new data
+                    renderPowerBubbleChart();
                 } else {
                     setGottaBulkImportStatus('error', 'No athletes found in GOTTA.BIKE database');
                 }
@@ -1259,6 +1264,9 @@ async function loadSubgroupEntrants(subgroupId) {
         document.getElementById('entrant-count').textContent = currentEntrants.length;
         document.getElementById('entrant-search').value = '';
         renderEntrants();
+
+        // Render chart (will show after data is imported)
+        renderPowerBubbleChart();
 
         document.getElementById('entrants-section').hidden = false;
     } catch (err) {
@@ -1549,12 +1557,259 @@ function hideEventError() {
 }
 
 // ============================================================================
-// ZwiftPower File Import
+// Power Bubble Chart
 // ============================================================================
 
-// Global state for ZwiftPower import
-let currentZpProfile = null;
-let selectedZpFile = null;
+// Chart instance reference
+let powerBubbleChart = null;
+
+// Power durations for the chart (in seconds)
+const CHART_POWER_DURATIONS = [
+    { seconds: 5, field: 'power_w5', wkgField: 'power_wkg5', label: '5s' },
+    { seconds: 15, field: 'power_w15', wkgField: 'power_wkg15', label: '15s' },
+    { seconds: 30, field: 'power_w30', wkgField: 'power_wkg30', label: '30s' },
+    { seconds: 60, field: 'power_w60', wkgField: 'power_wkg60', label: '1m' },
+    { seconds: 120, field: 'power_w120', wkgField: 'power_wkg120', label: '2m' },
+    { seconds: 300, field: 'power_w300', wkgField: 'power_wkg300', label: '5m' },
+    { seconds: 1200, field: 'power_w1200', wkgField: 'power_wkg1200', label: '20m' }
+];
+
+/**
+ * Generate a consistent color from a string (team name)
+ */
+function stringToColor(str) {
+    if (!str) return '#888888';
+    let hash = 0;
+    for (let i = 0; i < str.length; i++) {
+        hash = str.charCodeAt(i) + ((hash << 5) - hash);
+    }
+    const hue = Math.abs(hash) % 360;
+    return `hsl(${hue}, 70%, 50%)`;
+}
+
+/**
+ * Format duration in seconds to readable label
+ */
+function formatDurationLabel(seconds) {
+    if (seconds < 60) return `${seconds}s`;
+    if (seconds < 3600) return `${Math.round(seconds / 60)}m`;
+    return `${Math.round(seconds / 3600)}h`;
+}
+
+/**
+ * Render the power bubble chart
+ */
+function renderPowerBubbleChart() {
+    const chartContainer = document.getElementById('power-bubble-chart');
+    const chartSection = document.getElementById('chart-section');
+    if (!chartContainer || !chartSection) return;
+
+    // Collect data from entrants
+    const teamData = {};  // { teamName: { color: string, data: [] } }
+
+    for (const entrant of currentEntrants) {
+        const athleteId = entrant.id || entrant.athleteId;
+        const athleteData = storedAthleteData[athleteId];
+
+        // Skip athletes without imported data
+        if (!athleteData) continue;
+
+        // Get team name (fallback to 'No Team')
+        const team = athleteData.team ||
+                     storedMaxHRData[`team_${athleteId}`] ||
+                     entrant.team ||
+                     'No Team';
+
+        // Get athlete name
+        const name = athleteData.name || getEntrantName(entrant);
+
+        // Initialize team if not exists
+        if (!teamData[team]) {
+            teamData[team] = {
+                color: stringToColor(team),
+                data: []
+            };
+        }
+
+        // Add data point for each power duration that has data
+        for (const duration of CHART_POWER_DURATIONS) {
+            const watts = athleteData[duration.field];
+            let wkg = athleteData[duration.wkgField];
+
+            // Skip if no watts data
+            if (!watts || watts <= 0) continue;
+
+            // Calculate wkg if not available but we have weight
+            if (!wkg && athleteData.weight && athleteData.weight > 0) {
+                wkg = watts / athleteData.weight;
+            }
+
+            // Default wkg to a small value if still not available
+            if (!wkg || wkg <= 0) wkg = 1;
+
+            teamData[team].data.push({
+                x: duration.seconds,
+                y: Math.round(watts),
+                z: parseFloat(wkg.toFixed(2)),
+                meta: {
+                    name: name,
+                    duration: duration.label
+                }
+            });
+        }
+    }
+
+    // Convert to ApexCharts series format
+    const series = Object.entries(teamData)
+        .filter(([_, data]) => data.data.length > 0)
+        .map(([team, data]) => ({
+            name: team,
+            data: data.data
+        }));
+
+    // Hide chart if no data
+    if (series.length === 0) {
+        chartSection.hidden = true;
+        return;
+    }
+
+    chartSection.hidden = false;
+
+    // Generate colors array matching series order
+    const colors = Object.entries(teamData)
+        .filter(([_, data]) => data.data.length > 0)
+        .map(([_, data]) => data.color);
+
+    const chartOptions = {
+        chart: {
+            type: 'bubble',
+            height: 450,
+            background: 'transparent',
+            foreColor: '#ccc',
+            toolbar: {
+                show: true,
+                tools: {
+                    download: true,
+                    selection: true,
+                    zoom: true,
+                    zoomin: true,
+                    zoomout: true,
+                    pan: true,
+                    reset: true
+                }
+            },
+            animations: {
+                enabled: true,
+                speed: 400
+            }
+        },
+        theme: {
+            mode: 'dark'
+        },
+        colors: colors,
+        series: series,
+        xaxis: {
+            type: 'numeric',
+            title: {
+                text: 'Duration',
+                style: { color: '#aaa' }
+            },
+            min: 3,
+            max: 1500,
+            tickAmount: 7,
+            labels: {
+                formatter: (val) => formatDurationLabel(Math.round(val))
+            },
+            logarithmic: true
+        },
+        yaxis: {
+            title: {
+                text: 'Power (watts)',
+                style: { color: '#aaa' }
+            },
+            min: 0,
+            labels: {
+                formatter: (val) => Math.round(val)
+            }
+        },
+        tooltip: {
+            enabled: true,
+            custom: function({ seriesIndex, dataPointIndex, w }) {
+                const point = w.config.series[seriesIndex].data[dataPointIndex];
+                const teamName = w.config.series[seriesIndex].name;
+                return `
+                    <div class="apex-tooltip-custom">
+                        <div class="tooltip-title">${point.meta.name}</div>
+                        <div class="tooltip-team">${teamName}</div>
+                        <div class="tooltip-row">
+                            <span class="tooltip-label">Duration:</span>
+                            <span class="tooltip-value">${point.meta.duration}</span>
+                        </div>
+                        <div class="tooltip-row">
+                            <span class="tooltip-label">Power:</span>
+                            <span class="tooltip-value">${point.y} W</span>
+                        </div>
+                        <div class="tooltip-row">
+                            <span class="tooltip-label">W/kg:</span>
+                            <span class="tooltip-value">${point.z.toFixed(2)}</span>
+                        </div>
+                    </div>
+                `;
+            }
+        },
+        fill: {
+            opacity: 0.7
+        },
+        plotOptions: {
+            bubble: {
+                minBubbleRadius: 4,
+                maxBubbleRadius: 30
+            }
+        },
+        legend: {
+            show: true,
+            position: 'top',
+            horizontalAlign: 'left',
+            floating: false,
+            labels: {
+                colors: '#ccc'
+            }
+        },
+        grid: {
+            borderColor: '#444',
+            xaxis: {
+                lines: { show: true }
+            },
+            yaxis: {
+                lines: { show: true }
+            }
+        },
+        dataLabels: {
+            enabled: false
+        }
+    };
+
+    // Destroy existing chart if exists
+    if (powerBubbleChart) {
+        powerBubbleChart.destroy();
+    }
+
+    // Create new chart
+    powerBubbleChart = new ApexCharts(chartContainer, chartOptions);
+    powerBubbleChart.render();
+}
+
+/**
+ * Setup chart refresh button
+ */
+function setupChartControls() {
+    const refreshBtn = document.getElementById('refresh-chart-btn');
+    if (refreshBtn) {
+        refreshBtn.addEventListener('click', () => {
+            renderPowerBubbleChart();
+        });
+    }
+}
 
 // Event Viewer column configuration
 const EVENT_VIEWER_COLUMNS_KEY = '/hr-zone-monitor-event-columns';
@@ -1643,176 +1898,9 @@ const DEFAULT_VISIBLE_COLUMNS = ['name', 'team', 'zpCategory', 'zpFTP', 'power_w
 let eventViewerSort = { column: 'name', ascending: true };
 let visibleEventColumns = [...DEFAULT_VISIBLE_COLUMNS];
 
-// Storage key for ZwiftPower credentials
-const ZP_CREDENTIALS_KEY = '/hr-zone-monitor-zp-credentials';
-const ZP_SERVER_URL = 'http://127.0.0.1:5050';
-
 // Storage key for GOTTA.BIKE authentication
 const GOTTA_AUTH_KEY = '/hr-zone-monitor-gotta-auth';
 const GOTTA_API_URL = 'https://app.gotta.bike';
-
-/**
- * Setup ZwiftPower credentials handlers
- */
-function setupZpCredentials() {
-    const usernameInput = document.getElementById('zp-username');
-    const passwordInput = document.getElementById('zp-password');
-    const saveBtn = document.getElementById('zp-save-credentials');
-    const statusSpan = document.getElementById('zp-credentials-status');
-
-    if (!usernameInput || !passwordInput || !saveBtn) return;
-
-    // Load saved credentials
-    const saved = common.settingsStore.get(ZP_CREDENTIALS_KEY);
-    if (saved) {
-        usernameInput.value = saved.username || '';
-        passwordInput.value = saved.password || '';
-    }
-
-    // Save button handler
-    saveBtn.addEventListener('click', () => {
-        const credentials = {
-            username: usernameInput.value.trim(),
-            password: passwordInput.value
-        };
-
-        common.settingsStore.set(ZP_CREDENTIALS_KEY, credentials);
-
-        if (statusSpan) {
-            statusSpan.textContent = 'Saved!';
-            setTimeout(() => {
-                statusSpan.textContent = '';
-            }, 2000);
-        }
-    });
-}
-
-/**
- * Check if the ZP fetch server is running
- */
-async function checkZpServer() {
-    try {
-        const response = await fetch(`${ZP_SERVER_URL}/health`, {
-            signal: AbortSignal.timeout(2000)
-        });
-        return response.ok;
-    } catch {
-        return false;
-    }
-}
-
-/**
- * Update server status indicator
- */
-async function updateServerStatus() {
-    const statusEl = document.getElementById('zp-server-status');
-    if (!statusEl) return;
-
-    const isRunning = await checkZpServer();
-    statusEl.textContent = isRunning ? '● Server running' : '○ Server not running';
-    statusEl.className = isRunning ? 'zp-server-status online' : 'zp-server-status offline';
-}
-
-/**
- * Update fetch status display
- * @param {string} state - 'idle' | 'fetching' | 'success' | 'error'
- * @param {string} message - Optional message to display
- */
-function setFetchStatus(state, message = '') {
-    const statusEl = document.getElementById('zp-fetch-status');
-    if (!statusEl) return;
-
-    statusEl.className = 'zp-fetch-status ' + state;
-
-    switch (state) {
-        case 'idle':
-            statusEl.textContent = '';
-            break;
-        case 'fetching':
-            statusEl.innerHTML = '<span class="spinner-inline"></span> Fetching data...';
-            break;
-        case 'success':
-            statusEl.textContent = '✓ ' + message;
-            break;
-        case 'error':
-            statusEl.textContent = '✗ ' + message;
-            break;
-    }
-}
-
-/**
- * Setup ZwiftPower fetch handler
- */
-function setupZpFetch() {
-    const fetchBtn = document.getElementById('zp-fetch-btn');
-    const athleteIdInput = document.getElementById('zp-fetch-athlete-id');
-
-    if (!fetchBtn || !athleteIdInput) return;
-
-    // Check server status on load and periodically
-    updateServerStatus();
-    setInterval(updateServerStatus, 10000);
-
-    fetchBtn.addEventListener('click', async () => {
-        const athleteId = parseInt(athleteIdInput.value);
-        if (!athleteId || athleteId < 1) {
-            setFetchStatus('error', 'Please enter a valid Athlete ID');
-            return;
-        }
-
-        // Get saved credentials
-        const credentials = common.settingsStore.get(ZP_CREDENTIALS_KEY);
-        if (!credentials?.username || !credentials?.password) {
-            setFetchStatus('error', 'Please save your credentials first');
-            return;
-        }
-
-        // Show loading state
-        fetchBtn.disabled = true;
-        setFetchStatus('fetching');
-        document.getElementById('zp-profile-section').hidden = true;
-
-        try {
-            const profile = await fetchFromServer(athleteId, credentials);
-            displayZpProfile(profile);
-            const name = profile.data?.[0]?.name || `Athlete ${athleteId}`;
-            setFetchStatus('success', `Imported: ${name}`);
-        } catch (error) {
-            setFetchStatus('error', error.message);
-        } finally {
-            fetchBtn.disabled = false;
-        }
-    });
-}
-
-/**
- * Fetch profile from local server
- */
-async function fetchFromServer(athleteId, credentials) {
-    const params = new URLSearchParams({
-        athleteId: athleteId.toString(),
-        username: credentials.username,
-        password: credentials.password
-    });
-
-    const response = await fetch(`${ZP_SERVER_URL}/fetch?${params}`);
-
-    if (!response.ok) {
-        const data = await response.json().catch(() => ({}));
-        throw new Error(data.error || `Server error: ${response.status}`);
-    }
-
-    const data = await response.json();
-
-    if (!data.success) {
-        throw new Error(data.error || 'Failed to fetch profile');
-    }
-
-    return {
-        athleteId: data.athleteId,
-        data: data.data || []
-    };
-}
 
 /**
  * Setup zone color preview boxes to match current colors
@@ -1893,286 +1981,6 @@ function setupZoneColorResetButtons() {
             }
         });
     }
-}
-
-/**
- * Setup ZwiftPower tab UI handlers
- */
-function setupZwiftPowerTab() {
-    const fileInput = document.getElementById('zp-file-input');
-    const fileNameSpan = document.getElementById('zp-file-name');
-    const importFileBtn = document.getElementById('zp-import-file-btn');
-    const athleteIdInput = document.getElementById('zp-athlete-id');
-
-    // Setup credentials handlers
-    setupZpCredentials();
-
-    // Setup fetch handler
-    setupZpFetch();
-
-    // File selection handler
-    if (fileInput) {
-        fileInput.addEventListener('change', (ev) => {
-            const file = ev.target.files[0];
-            if (file) {
-                selectedZpFile = file;
-                if (fileNameSpan) {
-                    fileNameSpan.textContent = file.name;
-                }
-                // Try to extract athlete ID from filename (e.g., "87402_all.json")
-                const match = file.name.match(/^(\d+)_all\.json$/);
-                if (match && athleteIdInput) {
-                    athleteIdInput.value = match[1];
-                }
-            } else {
-                selectedZpFile = null;
-                if (fileNameSpan) {
-                    fileNameSpan.textContent = '';
-                }
-            }
-        });
-    }
-
-    // Import from file button handler
-    if (importFileBtn) {
-        importFileBtn.addEventListener('click', async () => {
-            const athleteId = parseInt(athleteIdInput?.value);
-            if (!athleteId || athleteId < 1) {
-                showZpError('Please enter a valid Athlete ID');
-                return;
-            }
-
-            if (!selectedZpFile) {
-                showZpError('Please select a JSON file first');
-                return;
-            }
-
-            await processZpFile(selectedZpFile, athleteId);
-        });
-    }
-}
-
-/**
- * Process uploaded ZwiftPower JSON file
- */
-async function processZpFile(file, athleteId) {
-    showZpLoading(true);
-    hideZpError();
-    document.getElementById('zp-profile-section').hidden = true;
-
-    try {
-        const text = await file.text();
-        let profileData;
-
-        try {
-            profileData = JSON.parse(text);
-        } catch (parseError) {
-            throw new Error('Invalid JSON file. Please ensure you downloaded the correct file from ZwiftPower.');
-        }
-
-        // Validate the data structure
-        if (!profileData.data || !Array.isArray(profileData.data)) {
-            throw new Error('Invalid ZwiftPower profile format. Expected { "data": [...] } structure.');
-        }
-
-        if (profileData.data.length === 0) {
-            throw new Error('No race data found in the profile file.');
-        }
-
-        currentZpProfile = {
-            athleteId,
-            ...profileData
-        };
-
-        displayZpProfile(currentZpProfile);
-
-    } catch (error) {
-        showZpError(error.message);
-        currentZpProfile = null;
-    } finally {
-        showZpLoading(false);
-    }
-}
-
-function displayZpProfile(profile) {
-    const container = document.getElementById('zp-profile-display');
-    const section = document.getElementById('zp-profile-section');
-
-    if (!container || !profile) return;
-
-    const data = profile.data || [];
-    if (data.length === 0) {
-        container.innerHTML = '<div class="zp-profile-row"><span class="zp-value">No race data found for this athlete.</span></div>';
-        section.hidden = false;
-        return;
-    }
-
-    const firstRace = data[0];
-    const athleteId = profile.athleteId;
-
-    // Filter to last 60 days
-    const now = Date.now() / 1000;  // Current time in seconds
-    const sixtyDaysAgo = now - (60 * 24 * 60 * 60);  // 60 days in seconds
-    const recentRaces = data.filter(race => (race.event_date || 0) >= sixtyDaysAgo);
-
-    // Find best power values from RECENT races only (last 60 days)
-    const bestValues = {
-        name: firstRace.name || `Athlete ${athleteId}`,
-        team: firstRace.tname || '',
-        ftp: parseInt(firstRace.ftp) || 0,
-        weight: parseFloat(firstRace.weight?.[0]) || 0,
-        category: firstRace.category || '',
-        country: firstRace.flag || '',
-        w5: 0,
-        w15: 0,
-        w60: 0,
-        w300: 0,
-        w1200: 0,
-        hrmax: 0,
-        raceCount: data.length,
-        recentRaceCount: recentRaces.length
-    };
-
-    // Find maximum power values from recent races only
-    for (const race of recentRaces) {
-        const w5 = parseInt(race.w5?.[0]) || 0;
-        const w15 = parseInt(race.w15?.[0]) || 0;
-        const w60 = parseInt(race.w60?.[0]) || 0;
-        const w300 = parseInt(race.w300?.[0]) || 0;
-        const w1200 = parseInt(race.w1200?.[0]) || 0;
-
-        if (w5 > bestValues.w5) bestValues.w5 = w5;
-        if (w15 > bestValues.w15) bestValues.w15 = w15;
-        if (w60 > bestValues.w60) bestValues.w60 = w60;
-        if (w300 > bestValues.w300) bestValues.w300 = w300;
-        if (w1200 > bestValues.w1200) bestValues.w1200 = w1200;
-    }
-
-    // Calculate average of top 3 max_hr values from recent races
-    const maxHrValues = recentRaces
-        .map(race => parseInt(race.max_hr?.[0]) || 0)
-        .filter(hr => hr > 0)
-        .sort((a, b) => b - a);  // Sort descending
-
-    const top3Hr = maxHrValues.slice(0, 3);
-    bestValues.hrmax = top3Hr.length > 0
-        ? Math.round(top3Hr.reduce((sum, hr) => sum + hr, 0) / top3Hr.length)
-        : 0;
-
-    // Build profile display HTML
-    const fields = [
-        { label: 'Athlete ID', value: athleteId },
-        { label: 'Name', value: bestValues.name },
-        { label: 'Team', value: bestValues.team || 'N/A' },
-        { label: 'Country', value: bestValues.country ? bestValues.country.toUpperCase() : 'N/A' },
-        { label: 'Category', value: bestValues.category || 'N/A' },
-        { label: 'FTP', value: bestValues.ftp ? `${bestValues.ftp}W` : 'N/A' },
-        { label: 'Weight', value: bestValues.weight ? `${bestValues.weight} kg` : 'N/A' },
-        { label: 'Avg Max HR (top 3)', value: bestValues.hrmax ? `${bestValues.hrmax} bpm` : 'N/A' },
-        { label: 'Best 5s (60d)', value: bestValues.w5 ? `${bestValues.w5}W` : 'N/A' },
-        { label: 'Best 15s (60d)', value: bestValues.w15 ? `${bestValues.w15}W` : 'N/A' },
-        { label: 'Best 1min (60d)', value: bestValues.w60 ? `${bestValues.w60}W` : 'N/A' },
-        { label: 'Best 5min (60d)', value: bestValues.w300 ? `${bestValues.w300}W` : 'N/A' },
-        { label: 'Best 20min (60d)', value: bestValues.w1200 ? `${bestValues.w1200}W` : 'N/A' },
-        { label: 'Races (60d / total)', value: `${bestValues.recentRaceCount} / ${bestValues.raceCount}` }
-    ];
-
-    container.innerHTML = fields.map(f => `
-        <div class="zp-profile-row">
-            <span class="zp-label">${f.label}:</span>
-            <span class="zp-value">${f.value}</span>
-        </div>
-    `).join('');
-
-    // Auto-import data to stored data
-    importZpData(athleteId, bestValues);
-
-    // Show raw data in collapsible section (limit to first 3 races for display)
-    const sampleData = data.slice(0, 3);
-    container.innerHTML += `
-        <details class="zp-raw-data">
-            <summary>View Raw Data (first ${sampleData.length} of ${data.length} races)</summary>
-            <pre>${JSON.stringify(sampleData, null, 2)}</pre>
-        </details>
-    `;
-
-    section.hidden = false;
-}
-
-function importZpData(athleteId, best) {
-    if (!athleteId || !best) return;
-
-    let imported = [];
-
-    // Import name
-    if (best.name) {
-        storedMaxHRData[`name_${athleteId}`] = best.name;
-        imported.push('name');
-    }
-
-    // Import team
-    if (best.team) {
-        storedMaxHRData[`team_${athleteId}`] = best.team;
-        imported.push('team');
-    }
-
-    // Import max HR (average of top 3)
-    if (best.hrmax && best.hrmax >= 100 && best.hrmax <= 250) {
-        storedMaxHRData[athleteId] = best.hrmax;
-        imported.push('max HR');
-    }
-
-    // Import power data (from last 60 days)
-    if (best.w5 > 0) {
-        storedMaxPowerData[`${athleteId}_5s`] = best.w5;
-        imported.push('5s power');
-    }
-    if (best.w15 > 0) {
-        storedMaxPowerData[`${athleteId}_15s`] = best.w15;
-        imported.push('15s power');
-    }
-    if (best.w60 > 0) {
-        storedMaxPowerData[`${athleteId}_60s`] = best.w60;
-        imported.push('1min power');
-    }
-    if (best.w300 > 0) {
-        storedMaxPowerData[`${athleteId}_300s`] = best.w300;
-        imported.push('5min power');
-    }
-    if (best.w1200 > 0) {
-        storedMaxPowerData[`${athleteId}_1200s`] = best.w1200;
-        imported.push('20min power');
-    }
-
-    // Save to storage
-    saveStoredMaxHRData();
-    saveStoredMaxPowerData();
-
-    // Show success message
-    const displayName = best.name || `Athlete ${athleteId}`;
-    showZpError(`Saved ${imported.length} values for ${displayName}: ${imported.join(', ')}`, 'success');
-
-    // Re-render athlete list if on settings tab
-    renderAthleteMaxListWithCurrentSearch();
-}
-
-function showZpLoading(show) {
-    const el = document.getElementById('zp-lookup-loading');
-    if (el) el.hidden = !show;
-}
-
-function showZpError(message, type = 'error') {
-    const errorEl = document.getElementById('zp-lookup-error');
-    if (errorEl) {
-        errorEl.textContent = message;
-        errorEl.className = type === 'success' ? 'zp-success-message' : '';
-        errorEl.hidden = false;
-    }
-}
-
-function hideZpError() {
-    const el = document.getElementById('zp-lookup-error');
-    if (el) el.hidden = true;
 }
 
 function renderAthleteMaxListWithCurrentSearch() {
@@ -2489,8 +2297,8 @@ function displayGottaAthleteData(athleteId, data) {
         }
     }
 
-    // ZwiftPower section
-    html += '<div class="gotta-section-title">ZwiftPower Data</div>';
+    // Racing category section
+    html += '<div class="gotta-section-title">Racing Data</div>';
     const zpFields = [
         { key: 'zpCategory', label: 'Category' },
         { key: 'zpFTP', label: 'FTP', suffix: 'W' }
@@ -2783,44 +2591,6 @@ function renderAthleteMaxList(searchFilter = '') {
             powerInputs.appendChild(powerInput);
         }
 
-        // Update button (fetch from ZwiftPower)
-        const updateBtn = document.createElement('button');
-        updateBtn.type = 'button';
-        updateBtn.className = 'update-btn';
-        updateBtn.innerHTML = '<ms>sync</ms>';
-        updateBtn.title = 'Update from ZwiftPower';
-        updateBtn.addEventListener('click', async () => {
-            // Get saved credentials
-            const credentials = common.settingsStore.get(ZP_CREDENTIALS_KEY);
-            if (!credentials?.username || !credentials?.password) {
-                alert('Please save your ZwiftPower credentials in the ZwiftPower tab first.');
-                return;
-            }
-
-            // Check if server is running
-            const serverRunning = await checkZpServer();
-            if (!serverRunning) {
-                alert('ZwiftPower fetch server is not running.\n\nStart it with: node zp-fetch.mjs --server');
-                return;
-            }
-
-            // Show loading state
-            updateBtn.disabled = true;
-            updateBtn.innerHTML = '<span class="spinner-inline"></span>';
-
-            try {
-                const profile = await fetchFromServer(athleteId, credentials);
-                displayZpProfile(profile);
-                // Re-render the list to show updated values
-                renderAthleteMaxListWithCurrentSearch();
-            } catch (error) {
-                alert(`Failed to update: ${error.message}`);
-            } finally {
-                updateBtn.disabled = false;
-                updateBtn.innerHTML = '<ms>sync</ms>';
-            }
-        });
-
         // Delete button
         const deleteBtn = document.createElement('button');
         deleteBtn.type = 'button';
@@ -2878,7 +2648,6 @@ function renderAthleteMaxList(searchFilter = '') {
         row.appendChild(teamInput);
         row.appendChild(hrInput);
         row.appendChild(powerInputs);
-        row.appendChild(updateBtn);
         row.appendChild(expandBtn);
         row.appendChild(deleteBtn);
 

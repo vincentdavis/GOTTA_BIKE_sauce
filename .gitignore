@@ -12,3 +12,4 @@ scripts/.env
 
 # ZwiftPower profile downloads
 scripts/zp-profiles/
+.idea

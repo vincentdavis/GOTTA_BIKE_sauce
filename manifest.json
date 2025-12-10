@@ -4,7 +4,7 @@
     "description": "Display nearby riders with heart rate color-coded by HR zone",
     "author": "Vincent Davis",
     "website_url": "https://gotta.bike",
-    "version": "1.52.0",
+    "version": "1.57.0",
     "content_js": [],
     "content_css": [],
     "web_root": "pages",
@@ -27,7 +27,7 @@
             "file": "pages/hr-zone-monitor-settings.html",
             "id": "hr-zone-monitor-settings",
             "name": "GOTTA.BIKE Settings",
-            "description": "Settings, Known Athletes, ZwiftPower integration, and Event Viewer",
+            "description": "Settings, Known Athletes, GOTTA.BIKE integration, and Event Viewer",
             "overlay": false,
             "frame": true,
             "default_bounds": {
