@@ -563,11 +563,13 @@ function setupImportButton() {
             importBtn.disabled = true;
             importBtn.textContent = 'Importing...';
             setImportStatus('', `Importing ${athleteIds.length} athletes...`);
+            console.log('[PreRace] Starting import of', athleteIds.length, 'athletes');
 
             try {
                 const results = await bulkImportFromGotta(athleteIds, (current, total) => {
                     setImportStatus('', `Importing ${current} of ${total}...`);
                 });
+                console.log('[PreRace] Import results:', results);
 
                 if (results.success > 0) {
                     let message = `Imported ${results.success} athletes`;
@@ -575,7 +577,12 @@ function setupImportButton() {
                         message += `, ${results.failed} not found`;
                     }
                     setImportStatus('success', message);
-                    renderHeatmap();
+                    try {
+                        renderHeatmap();
+                    } catch (renderErr) {
+                        console.error('Heatmap render error:', renderErr);
+                        setImportStatus('error', `Import succeeded but display failed: ${renderErr.message}`);
+                    }
                 } else {
                     setImportStatus('error', 'No athletes found in GOTTA.BIKE');
                 }
@@ -583,6 +590,7 @@ function setupImportButton() {
                 console.error('Bulk import error:', error);
                 setImportStatus('error', error.message);
             } finally {
+                console.log('[PreRace] Import finished, resetting button');
                 importBtn.disabled = false;
                 importBtn.textContent = 'Import Data';
             }
@@ -746,7 +754,9 @@ async function loadSubgroupEntrants(subgroupId) {
  * Bulk import athlete data from GOTTA.BIKE
  */
 async function bulkImportFromGotta(athleteIds, progressCallback) {
+    console.log('[PreRace] bulkImportFromGotta called with', athleteIds.length, 'athletes');
     const authData = common.settingsStore.get(GOTTA_AUTH_KEY);
+    console.log('[PreRace] Auth data:', authData ? { api_key: authData.api_key ? '***present***' : 'missing', expires_at: authData.expires_at } : 'null');
 
     if (!authData?.api_key) {
         throw new Error('Not authenticated with GOTTA.BIKE. Please authenticate in PreRace Settings (GOTTA.BIKE tab).');
@@ -762,12 +772,14 @@ async function bulkImportFromGotta(athleteIds, progressCallback) {
 
     for (let i = 0; i < athleteIds.length; i += batchSize) {
         const batch = athleteIds.slice(i, i + batchSize);
+        console.log(`[PreRace] Processing batch ${i / batchSize + 1}, athletes ${i + 1}-${Math.min(i + batchSize, athleteIds.length)}`);
 
         if (progressCallback) {
             progressCallback(Math.min(i + batchSize, athleteIds.length), athleteIds.length);
         }
 
         try {
+            console.log('[PreRace] Fetching from GOTTA.BIKE API...');
             const response = await fetch(`${GOTTA_API_URL}/api_v1/zrapp/riders_sauce_mod`, {
                 method: 'POST',
                 headers: {
@@ -776,6 +788,7 @@ async function bulkImportFromGotta(athleteIds, progressCallback) {
                 },
                 body: JSON.stringify({ rider_ids: batch })
             });
+            console.log('[PreRace] API response status:', response.status);
 
             if (!response.ok) {
                 if (response.status === 401) {
@@ -785,6 +798,7 @@ async function bulkImportFromGotta(athleteIds, progressCallback) {
             }
 
             const data = await response.json();
+            console.log('[PreRace] API returned', data.riders?.length || 0, 'riders');
 
             if (data.riders && Array.isArray(data.riders)) {
                 for (const rider of data.riders) {
@@ -797,57 +811,37 @@ async function bulkImportFromGotta(athleteIds, progressCallback) {
 
             results.failed += batch.length - (data.riders?.length || 0);
         } catch (err) {
-            console.error('Batch import error:', err);
+            console.error('[PreRace] Batch import error:', err);
             throw err;
         }
     }
 
+    console.log('[PreRace] All batches complete, saving data');
     saveStoredAthleteData();
+    console.log('[PreRace] Data saved, returning results');
     return results;
 }
 
 /**
  * Import single athlete data from API response
+ * Uses spread operator to preserve ALL fields from API (matches live-stats.mjs)
  */
 function importAthleteData(riderData) {
-    const athleteId = riderData.riderId;
-    if (!athleteId) return;
+    if (!riderData || !riderData.riderId) return;
 
-    const flatData = {
-        riderId: athleteId,
-        name: riderData.name,
-        gender: riderData.gender,
-        country: riderData.country,
-        height: riderData.height,
-        weight: riderData.weight,
-        zpCategory: riderData.zpCategory,
-        zpFTP: riderData.zpFTP,
+    const athleteId = riderData.riderId;
+
+    // Get existing data to preserve any local additions (like HR data)
+    const existingData = storedAthleteData[athleteId] || {};
+
+    // Store ALL API fields using spread, preserving existing local data
+    storedAthleteData[athleteId] = {
+        ...riderData,
+        // Preserve existing maxHR if we have it (not provided by API)
+        maxHR: existingData.maxHR || null,
+        // Add import timestamp
         importedAt: Date.now()
     };
-
-    // Power data
-    if (riderData.power) {
-        flatData.power_CP = riderData.power.CP;
-        flatData.power_AWC = riderData.power.AWC;
-        flatData.power_powerRating = riderData.power.powerRating;
-        flatData.power_compoundScore = riderData.power.compoundScore;
-        flatData.power_w5 = riderData.power.w5;
-        flatData.power_w15 = riderData.power.w15;
-        flatData.power_w30 = riderData.power.w30;
-        flatData.power_w60 = riderData.power.w60;
-        flatData.power_w120 = riderData.power.w120;
-        flatData.power_w300 = riderData.power.w300;
-        flatData.power_w1200 = riderData.power.w1200;
-        flatData.power_wkg5 = riderData.power.wkg5;
-        flatData.power_wkg15 = riderData.power.wkg15;
-        flatData.power_wkg30 = riderData.power.wkg30;
-        flatData.power_wkg60 = riderData.power.wkg60;
-        flatData.power_wkg120 = riderData.power.wkg120;
-        flatData.power_wkg300 = riderData.power.wkg300;
-        flatData.power_wkg1200 = riderData.power.wkg1200;
-    }
-
-    storedAthleteData[athleteId] = flatData;
 }
 
 /**

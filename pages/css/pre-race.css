@@ -132,12 +132,15 @@ body.solid-background {
 
 /* Loading */
 #loading {
-    display: flex;
     align-items: center;
     justify-content: center;
     gap: 0.5em;
     padding: 2em;
     color: #aaa;
+}
+
+#loading:not([hidden]) {
+    display: flex;
 }
 
 .spinner {
