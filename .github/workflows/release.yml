@@ -1,0 +1,33 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Extract version from tag
+        id: version
+        run: echo "VERSION=${GITHUB_REF_NAME#v}" >> $GITHUB_OUTPUT
+
+      - name: Create release ZIP
+        run: |
+          mkdir -p dist/GOTTA_BIKE_sauce
+          cp manifest.json dist/GOTTA_BIKE_sauce/
+          cp -r pages dist/GOTTA_BIKE_sauce/
+          find dist -name '.DS_Store' -delete
+          cd dist && zip -r GOTTA_BIKE_sauce_${{ steps.version.outputs.VERSION }}.zip GOTTA_BIKE_sauce
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/GOTTA_BIKE_sauce_${{ steps.version.outputs.VERSION }}.zip
+          generate_release_notes: true
