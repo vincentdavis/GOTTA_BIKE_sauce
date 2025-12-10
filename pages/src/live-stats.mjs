@@ -823,56 +823,16 @@ export async function settingsMain() {
     await common.initSettingsForm('form#hr-zone-colors')();
     await common.initSettingsForm('form#power-zone-colors')();
 
-    // Resize window to fit content (850x600 is good for Known Athletes table)
+    // Resize window to fit content
     window.resizeTo(850, 600);
 
     loadStoredMaxHRData();
     loadStoredMaxPowerData();
     loadStoredAthleteData();
-    renderAthleteMaxList();
     setupBackgroundOptionToggle();
-    setupAthleteSearch();
     setupTabNavigation();
-    setupEventViewer();
     setupZoneColorPreviews();
     setupZoneColorResetButtons();
-
-    // Add rider button handler
-    const addBtn = document.getElementById('add-rider-btn');
-    if (addBtn) {
-        addBtn.addEventListener('click', () => {
-            const idInput = document.getElementById('new-rider-id');
-            const maxhrInput = document.getElementById('new-rider-maxhr');
-            const nameInput = document.getElementById('new-rider-name');
-
-            const athleteId = parseInt(idInput.value);
-            const maxHR = parseInt(maxhrInput.value);
-
-            if (athleteId && maxHR && maxHR >= 100 && maxHR <= 250) {
-                storedMaxHRData[athleteId] = Math.round(maxHR);
-                if (nameInput && nameInput.value) {
-                    storedMaxHRData[`name_${athleteId}`] = nameInput.value;
-                }
-                saveStoredMaxHRData();
-                renderAthleteMaxList();
-                idInput.value = '';
-                maxhrInput.value = '';
-                if (nameInput) nameInput.value = '';
-            }
-        });
-    }
-
-    // Listen for storage changes
-    common.settingsStore.addEventListener('set', ev => {
-        if (ev.data.key === MAX_HR_STORAGE_KEY) {
-            storedMaxHRData = ev.data.value || {};
-            renderAthleteMaxListWithCurrentSearch();
-        }
-        if (ev.data.key === MAX_POWER_STORAGE_KEY) {
-            storedMaxPowerData = ev.data.value || {};
-            renderAthleteMaxListWithCurrentSearch();
-        }
-    });
 }
 
 // Tab navigation

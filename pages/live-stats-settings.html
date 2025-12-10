@@ -6,14 +6,14 @@
         <meta name="apple-mobile-web-app-capable" content="yes"/>
         <meta http-equiv="Content-Security-Policy" content="script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net;"/>
 
-        <title>GOTTA.BIKE sauce - Settings</title>
+        <title>GOTTA.BIKE Live Stats - Settings</title>
 
         <link id="favicon" rel="shortcut icon" href="/pages/images/favicon.png"/>
         <link rel="stylesheet" href="/pages/css/common.css"/>
         <link rel="stylesheet" href="./css/live-stats.css"/>
         <link rel="stylesheet" href="./css/event-viewer.css"/>
 
-        <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
+<!--        <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>-->
         <script type="module">
             import {settingsMain} from './src/live-stats.mjs';
             settingsMain();
@@ -23,7 +23,7 @@
         <div id="titlebar">
             <header>
                 <div class="logo"><img src="/pages/images/icon128.png"/></div>
-                <div class="title">GOTTA.BIKE sauce</div>
+                <div class="title">GOTTA.BIKE Live Stats - Settings</div>
                 <div class="filler"></div>
                 <div class="buttons">
                     <div title="Close this window" class="button close electron-only"><ms>close</ms></div>
@@ -33,8 +33,6 @@
 
         <div class="tab-navigation">
             <button type="button" class="tab-btn active" data-tab="settings-tab">Settings</button>
-            <button type="button" class="tab-btn" data-tab="athletes-tab">Known Athletes</button>
-            <button type="button" class="tab-btn" data-tab="events-tab">Event Viewer</button>
             <button type="button" class="tab-btn" data-tab="help-tab">Help</button>
         </div>
 
@@ -226,111 +224,6 @@
 
         </div>
         </div><!-- end #settings-tab -->
-
-        <div id="athletes-tab" class="tab-panel">
-            <div class="athletes-content">
-                <div class="section">
-                    <div class="title">Known Athletes</div>
-                    <p class="hint">
-                        Max values are automatically tracked during rides and from GOTTA.BIKE imports. Click values to edit.
-                    </p>
-                    <div class="athlete-search-bar">
-                        <input type="text" id="athlete-search" placeholder="Search by name, team, or ID..."/>
-                    </div>
-                    <div id="athlete-max-list"></div>
-                </div>
-
-                <div class="section">
-                    <div class="title">Add Athlete Manually</div>
-                    <div class="add-rider-form">
-                        <input type="text" id="new-rider-name" placeholder="Name (optional)"/>
-                        <input type="number" id="new-rider-id" placeholder="Athlete ID" min="1"/>
-                        <input type="number" id="new-rider-maxhr" placeholder="Max HR" min="100" max="250"/>
-                        <button type="button" id="add-rider-btn">Add</button>
-                    </div>
-                </div>
-            </div>
-        </div><!-- end #athletes-tab -->
-
-        <div id="events-tab" class="tab-panel">
-            <div id="event-viewer-content">
-                <div class="input-section">
-                    <input type="text" id="event-input" placeholder="Enter Event ID or Zwift event URL..."/>
-                    <button type="button" id="load-event-btn">Load</button>
-                </div>
-
-                <div id="cached-events-section">
-                    <label for="cached-events">Or select a recent event:</label>
-                    <select id="cached-events">
-                        <option value="">-- Select Event --</option>
-                    </select>
-                </div>
-
-                <div id="event-info" hidden>
-                    <div class="event-header">
-                        <h2 id="event-name"></h2>
-                        <div id="event-start"></div>
-                    </div>
-
-                    <div class="subgroup-selector">
-                        <label for="subgroup-select">Category:</label>
-                        <select id="subgroup-select">
-                            <option value="">-- Select Category --</option>
-                        </select>
-                    </div>
-
-                    <div id="subgroup-info" hidden>
-                        <div class="subgroup-details">
-                            <span class="detail"><strong>Route:</strong> <span id="sg-route"></span></span>
-                            <span class="detail"><strong>Distance:</strong> <span id="sg-distance"></span></span>
-                            <span class="detail"><strong>Laps:</strong> <span id="sg-laps"></span></span>
-                            <span class="detail"><strong>Start:</strong> <span id="sg-start"></span></span>
-                        </div>
-                    </div>
-
-                    <div id="entrants-section" hidden>
-                        <div class="entrants-header">
-                            <h3>Entrants (<span id="entrant-count">0</span>)</h3>
-                            <div class="entrants-actions">
-                                <button type="button" id="gotta-bulk-import-btn" class="gotta-bulk-import-btn">
-                                    Import Data
-                                </button>
-                                <button type="button" id="column-config-btn" class="column-config-btn" title="Configure columns">
-                                    <ms>view_column</ms>
-                                </button>
-                            </div>
-                        </div>
-                        <div id="gotta-bulk-import-status" class="gotta-bulk-import-status"></div>
-                        <div id="column-config-panel" class="column-config-panel" hidden>
-                            <div class="column-config-title">Select Columns to Display</div>
-                            <div id="column-checkboxes" class="column-checkboxes"></div>
-                            <div class="column-config-actions">
-                                <button type="button" id="reset-columns-btn">Reset to Default</button>
-                            </div>
-                        </div>
-                        <div class="search-bar">
-                            <input type="text" id="entrant-search" placeholder="Search by name..."/>
-                        </div>
-                        <div id="entrants-list"></div>
-
-                        <div id="chart-section" hidden>
-                            <div class="chart-header">
-                                <h3>Power Analysis</h3>
-                            </div>
-                            <div id="power-bubble-chart"></div>
-                        </div>
-                    </div>
-                </div>
-
-                <div id="loading" hidden>
-                    <div class="spinner"></div>
-                    <span>Loading...</span>
-                </div>
-
-                <div id="error-message" hidden></div>
-            </div>
-        </div><!-- end #events-tab -->
-
 
         <div id="help-tab" class="tab-panel">
             <div class="help-content">

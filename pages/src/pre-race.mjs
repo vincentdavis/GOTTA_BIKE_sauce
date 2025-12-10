@@ -3,10 +3,21 @@ import * as common from '/pages/src/common.mjs';
 // Storage keys (global, shared across windows)
 const ATHLETE_DATA_KEY = '/hr-zone-monitor-athlete-data';
 const GOTTA_AUTH_KEY = '/hr-zone-monitor-gotta-auth';
+const MAX_HR_STORAGE_KEY = '/hr-zone-monitor-max-hr-data';
+const MAX_POWER_STORAGE_KEY = '/hr-zone-monitor-max-power-data';
 const GOTTA_API_URL = 'https://app.gotta.bike';
 
 // PreRace-specific settings
 const PRERACE_SETTINGS_KEY = '/pre-race-settings';
+
+// Power columns for athlete list display
+const POWER_COLUMNS = [
+    { key: 'power5s', seconds: 5, label: '5s' },
+    { key: 'power15s', seconds: 15, label: '15s' },
+    { key: 'power60s', seconds: 60, label: '1m' },
+    { key: 'power300s', seconds: 300, label: '5m' },
+    { key: 'power1200s', seconds: 1200, label: '20m' }
+];
 
 // Background color options
 const BACKGROUND_OPTIONS = {
@@ -23,6 +34,8 @@ const BACKGROUND_OPTIONS = {
 let currentEvent = null;
 let currentEntrants = [];
 let storedAthleteData = {};
+let storedMaxHRData = {};
+let storedMaxPowerData = {};
 let heatmapChart = null;
 let currentSort = { column: 'wkg60', ascending: false };
 
@@ -121,8 +134,9 @@ common.settingsStore.setDefault({
 export async function preRaceMain() {
     common.initInteractionListeners();
 
-    // Load stored athlete data
+    // Load stored data
     loadStoredAthleteData();
+    loadStoredMaxHRData();  // Needed for team names
 
     // Apply font scale
     const fontScale = common.settingsStore.get('fontScale') || 1;
@@ -212,6 +226,30 @@ export async function preRaceSettingsMain() {
     // Setup GOTTA.BIKE auth and lookup
     setupGottaBikeAuth();
     setupGottaAthleteLookup();
+
+    // Setup Known Athletes tab
+    loadStoredMaxHRData();
+    loadStoredMaxPowerData();
+    loadStoredAthleteData();
+    setupAthleteSearch();
+    setupAddRiderButton();
+    renderAthleteMaxList();
+
+    // Listen for storage changes to update athlete list
+    common.settingsStore.addEventListener('set', ev => {
+        if (ev.data.key === MAX_HR_STORAGE_KEY) {
+            storedMaxHRData = ev.data.value || {};
+            renderAthleteMaxListWithCurrentSearch();
+        }
+        if (ev.data.key === MAX_POWER_STORAGE_KEY) {
+            storedMaxPowerData = ev.data.value || {};
+            renderAthleteMaxListWithCurrentSearch();
+        }
+        if (ev.data.key === ATHLETE_DATA_KEY) {
+            storedAthleteData = ev.data.value || {};
+            renderAthleteMaxListWithCurrentSearch();
+        }
+    });
 }
 
 /**
@@ -968,7 +1006,12 @@ function renderHeatmap() {
     // Each series is a rider (row), with data points for each column
     const series = riders.map(rider => {
         const data = visibleColumns.map(col => {
-            const rawValue = rider.athleteData[col.dataKey];
+            let rawValue = rider.athleteData[col.dataKey];
+
+            // For team column, check storedMaxHRData first (user-entered takes priority)
+            if (col.id === 'team') {
+                rawValue = storedMaxHRData[`team_${rider.id}`] || rawValue || '';
+            }
 
             // Handle text columns differently - no color scaling
             if (col.format === 'text') {
@@ -1057,13 +1100,13 @@ function renderHeatmap() {
                 colorScale: {
                     ranges: [
                         { from: -1, to: 0, color: '#555555', name: 'No data' },
-                        { from: 0, to: 10, color: '#FF2222', name: 'Very Low' },
-                        { from: 10, to: 25, color: '#FF6633', name: 'Low' },
-                        { from: 25, to: 40, color: '#FFAA33', name: 'Below Median' },
+                        { from: 0, to: 10, color: '#33BB33', name: 'Very Low' },
+                        { from: 10, to: 25, color: '#77CC33', name: 'Low' },
+                        { from: 25, to: 40, color: '#BBDD33', name: 'Below Median' },
                         { from: 40, to: 60, color: '#FFDD44', name: 'Median' },
-                        { from: 60, to: 75, color: '#BBDD33', name: 'Above Median' },
-                        { from: 75, to: 90, color: '#77CC33', name: 'High' },
-                        { from: 90, to: 101, color: '#33BB33', name: 'Very High' }
+                        { from: 60, to: 75, color: '#FFAA33', name: 'Above Median' },
+                        { from: 75, to: 90, color: '#FF6633', name: 'High' },
+                        { from: 90, to: 101, color: '#FF2222', name: 'Very High' }
                     ]
                 }
             }
@@ -1660,4 +1703,442 @@ function displayGottaAthleteData(athleteId, data) {
 
     dataDiv.innerHTML = html;
     dataDiv.hidden = false;
+}
+
+// ============================================================================
+// Known Athletes Tab Functions
+// ============================================================================
+
+function loadStoredMaxHRData() {
+    storedMaxHRData = common.settingsStore.get(MAX_HR_STORAGE_KEY) || {};
+}
+
+function saveStoredMaxHRData() {
+    common.settingsStore.set(MAX_HR_STORAGE_KEY, storedMaxHRData);
+}
+
+function loadStoredMaxPowerData() {
+    storedMaxPowerData = common.settingsStore.get(MAX_POWER_STORAGE_KEY) || {};
+}
+
+function saveStoredMaxPowerData() {
+    common.settingsStore.set(MAX_POWER_STORAGE_KEY, storedMaxPowerData);
+}
+
+function setupAthleteSearch() {
+    const searchInput = document.getElementById('athlete-search');
+    if (!searchInput) return;
+
+    searchInput.addEventListener('input', (ev) => {
+        renderAthleteMaxList(ev.target.value);
+    });
+}
+
+function renderAthleteMaxListWithCurrentSearch() {
+    const searchInput = document.getElementById('athlete-search');
+    const currentFilter = searchInput ? searchInput.value : '';
+    renderAthleteMaxList(currentFilter);
+}
+
+function setupAddRiderButton() {
+    const addBtn = document.getElementById('add-rider-btn');
+    if (!addBtn) return;
+
+    addBtn.addEventListener('click', () => {
+        const idInput = document.getElementById('new-rider-id');
+        const maxhrInput = document.getElementById('new-rider-maxhr');
+        const nameInput = document.getElementById('new-rider-name');
+
+        const athleteId = parseInt(idInput.value);
+        const maxHR = parseInt(maxhrInput.value);
+
+        if (athleteId && maxHR && maxHR >= 100 && maxHR <= 250) {
+            storedMaxHRData[athleteId] = Math.round(maxHR);
+            if (nameInput && nameInput.value) {
+                storedMaxHRData[`name_${athleteId}`] = nameInput.value;
+            }
+            saveStoredMaxHRData();
+            renderAthleteMaxList();
+            idInput.value = '';
+            maxhrInput.value = '';
+            if (nameInput) nameInput.value = '';
+        }
+    });
+}
+
+function renderAthleteMaxList(searchFilter = '') {
+    const container = document.getElementById('athlete-max-list');
+    if (!container) return;
+
+    container.innerHTML = '';
+
+    // Collect all athlete IDs from both HR and power data
+    const hrAthleteIds = Object.keys(storedMaxHRData)
+        .filter(key => !key.startsWith('name_') && !key.startsWith('team_'))
+        .map(Number)
+        .filter(id => !isNaN(id));
+
+    const powerAthleteIds = Object.keys(storedMaxPowerData)
+        .map(key => {
+            const match = key.match(/^(\d+)_\d+s$/);
+            return match ? parseInt(match[1]) : null;
+        })
+        .filter(id => id !== null);
+
+    let allAthleteIds = [...new Set([...hrAthleteIds, ...powerAthleteIds])];
+
+    // Apply search filter
+    if (searchFilter) {
+        const filterLower = searchFilter.toLowerCase();
+        allAthleteIds = allAthleteIds.filter(athleteId => {
+            const name = storedMaxHRData[`name_${athleteId}`] || '';
+            const team = storedMaxHRData[`team_${athleteId}`] || '';
+            const idStr = String(athleteId);
+            return name.toLowerCase().includes(filterLower) ||
+                   team.toLowerCase().includes(filterLower) ||
+                   idStr.includes(filterLower);
+        });
+    }
+
+    // Add header row
+    const headerRow = document.createElement('div');
+    headerRow.className = 'athlete-max-row athlete-max-header';
+    headerRow.innerHTML = `
+        <div class="athlete-info"><span class="header-label">Athlete</span></div>
+        <span class="header-label team-header">Team</span>
+        <span class="header-label hr-header">HR</span>
+        <div class="power-inputs header-power">
+            ${POWER_COLUMNS.map(col => `<span class="header-label">${col.label}</span>`).join('')}
+        </div>
+        <span class="header-label expand-header"></span>
+        <span class="header-label delete-header"></span>
+    `;
+    container.appendChild(headerRow);
+
+    if (allAthleteIds.length === 0) {
+        const emptyMsg = document.createElement('div');
+        emptyMsg.className = 'no-riders';
+        emptyMsg.textContent = searchFilter
+            ? 'No athletes match your search.'
+            : 'No athlete data yet. Max values are automatically tracked during rides, or add manually below.';
+        container.appendChild(emptyMsg);
+        return;
+    }
+
+    // Group power data by athlete
+    const athletePowerData = {};
+    for (const [key, value] of Object.entries(storedMaxPowerData)) {
+        const match = key.match(/^(\d+)_(\d+)s$/);
+        if (match) {
+            const athleteId = parseInt(match[1]);
+            const seconds = parseInt(match[2]);
+            if (!athletePowerData[athleteId]) {
+                athletePowerData[athleteId] = {};
+            }
+            athletePowerData[athleteId][seconds] = value;
+        }
+    }
+
+    for (const athleteId of allAthleteIds) {
+        const name = storedMaxHRData[`name_${athleteId}`] || `Athlete ${athleteId}`;
+        const team = storedMaxHRData[`team_${athleteId}`] || '';
+        const maxHR = storedMaxHRData[athleteId] || '';
+        const powers = athletePowerData[athleteId] || {};
+
+        const row = document.createElement('div');
+        row.className = 'athlete-max-row';
+
+        // Name, team, and ID info
+        const infoDiv = document.createElement('div');
+        infoDiv.className = 'athlete-info';
+
+        const nameSpan = document.createElement('span');
+        nameSpan.className = 'athlete-name';
+        nameSpan.textContent = name;
+        infoDiv.appendChild(nameSpan);
+
+        const metaSpan = document.createElement('span');
+        metaSpan.className = 'athlete-meta';
+        const metaParts = [];
+        if (team) metaParts.push(team);
+        metaParts.push(`ID: ${athleteId}`);
+        metaSpan.textContent = metaParts.join(' · ');
+        infoDiv.appendChild(metaSpan);
+
+        // Team input
+        const teamInput = document.createElement('input');
+        teamInput.type = 'text';
+        teamInput.className = 'team-input';
+        teamInput.value = team;
+        teamInput.placeholder = 'Team';
+        teamInput.title = 'Team name';
+        teamInput.addEventListener('change', (ev) => {
+            const newTeam = ev.target.value.trim();
+            if (newTeam) {
+                storedMaxHRData[`team_${athleteId}`] = newTeam;
+            } else {
+                delete storedMaxHRData[`team_${athleteId}`];
+            }
+            saveStoredMaxHRData();
+            const metaParts = [];
+            if (newTeam) metaParts.push(newTeam);
+            metaParts.push(`ID: ${athleteId}`);
+            metaSpan.textContent = metaParts.join(' · ');
+        });
+
+        // Max HR input
+        const hrInput = document.createElement('input');
+        hrInput.type = 'number';
+        hrInput.className = 'max-value-input';
+        hrInput.value = maxHR;
+        hrInput.min = 100;
+        hrInput.max = 250;
+        hrInput.placeholder = 'HR';
+        hrInput.title = 'Max HR';
+        hrInput.addEventListener('change', (ev) => {
+            const newMaxHR = parseInt(ev.target.value);
+            if (newMaxHR >= 100 && newMaxHR <= 250) {
+                storedMaxHRData[athleteId] = Math.round(newMaxHR);
+                saveStoredMaxHRData();
+            } else if (ev.target.value === '') {
+                delete storedMaxHRData[athleteId];
+                saveStoredMaxHRData();
+            }
+        });
+
+        // Power inputs container
+        const powerInputs = document.createElement('div');
+        powerInputs.className = 'power-inputs';
+
+        for (const col of POWER_COLUMNS) {
+            const powerValue = powers[col.seconds] || '';
+            const powerInput = document.createElement('input');
+            powerInput.type = 'number';
+            powerInput.className = 'max-value-input power-input';
+            powerInput.value = powerValue;
+            powerInput.min = 0;
+            powerInput.max = 2500;
+            powerInput.placeholder = col.label;
+            powerInput.title = `Max ${col.label} power`;
+            powerInput.addEventListener('change', (ev) => {
+                const key = `${athleteId}_${col.seconds}s`;
+                const newPower = parseInt(ev.target.value);
+                if (newPower > 0) {
+                    storedMaxPowerData[key] = Math.round(newPower);
+                    saveStoredMaxPowerData();
+                } else {
+                    delete storedMaxPowerData[key];
+                    saveStoredMaxPowerData();
+                }
+            });
+            powerInputs.appendChild(powerInput);
+        }
+
+        // Delete button
+        const deleteBtn = document.createElement('button');
+        deleteBtn.type = 'button';
+        deleteBtn.className = 'delete-btn';
+        deleteBtn.innerHTML = '<ms>delete</ms>';
+        deleteBtn.title = 'Delete all data for this athlete';
+        deleteBtn.addEventListener('click', () => {
+            // Delete HR data
+            delete storedMaxHRData[athleteId];
+            delete storedMaxHRData[`name_${athleteId}`];
+            delete storedMaxHRData[`team_${athleteId}`];
+            saveStoredMaxHRData();
+
+            // Delete all power data for this athlete
+            for (const col of POWER_COLUMNS) {
+                delete storedMaxPowerData[`${athleteId}_${col.seconds}s`];
+            }
+            saveStoredMaxPowerData();
+
+            // Delete athlete data
+            delete storedAthleteData[athleteId];
+            saveStoredAthleteData();
+
+            renderAthleteMaxList();
+        });
+
+        // Expand button to show all data
+        const expandBtn = document.createElement('button');
+        expandBtn.type = 'button';
+        expandBtn.className = 'expand-btn';
+        expandBtn.innerHTML = '<ms>expand_more</ms>';
+        expandBtn.title = 'Show all data';
+
+        // Create expandable details panel
+        const detailsPanel = document.createElement('div');
+        detailsPanel.className = 'athlete-details-panel';
+        detailsPanel.hidden = true;
+
+        // Check if we have GOTTA.BIKE data
+        const gottaData = storedAthleteData[athleteId];
+        if (gottaData) {
+            detailsPanel.innerHTML = renderAthleteDetailsPanel(athleteId, gottaData);
+        } else {
+            detailsPanel.innerHTML = '<div class="no-gotta-data">No extended data available. Import from GOTTA.BIKE to see additional fields.</div>';
+        }
+
+        expandBtn.addEventListener('click', () => {
+            const isExpanded = !detailsPanel.hidden;
+            detailsPanel.hidden = isExpanded;
+            expandBtn.innerHTML = isExpanded ? '<ms>expand_more</ms>' : '<ms>expand_less</ms>';
+            expandBtn.title = isExpanded ? 'Show all data' : 'Hide details';
+        });
+
+        row.appendChild(infoDiv);
+        row.appendChild(teamInput);
+        row.appendChild(hrInput);
+        row.appendChild(powerInputs);
+        row.appendChild(expandBtn);
+        row.appendChild(deleteBtn);
+
+        // Create a wrapper to hold both the row and the details panel
+        const rowWrapper = document.createElement('div');
+        rowWrapper.className = 'athlete-row-wrapper';
+        rowWrapper.appendChild(row);
+        rowWrapper.appendChild(detailsPanel);
+
+        container.appendChild(rowWrapper);
+    }
+}
+
+/**
+ * Render the details panel HTML for an athlete
+ */
+function renderAthleteDetailsPanel(athleteId, data) {
+    // Helper to render a section
+    function renderSection(title, fields) {
+        let sectionHtml = '';
+        let hasContent = false;
+
+        for (const field of fields) {
+            const value = data[field.key];
+            if (value !== undefined && value !== null && value !== '' && value !== 0) {
+                hasContent = true;
+                let displayValue = value;
+                if (typeof value === 'number') {
+                    if (field.decimals !== undefined) {
+                        displayValue = value.toFixed(field.decimals);
+                    } else if (field.round) {
+                        displayValue = Math.round(value);
+                    }
+                }
+                if (field.suffix) {
+                    displayValue += ` ${field.suffix}`;
+                }
+                sectionHtml += `<div class="details-item"><span class="details-label">${field.label}:</span><span class="details-value">${displayValue}</span></div>`;
+            }
+        }
+
+        if (!hasContent) return '';
+        return `<div class="details-section"><div class="details-section-title">${title}</div><div class="details-grid">${sectionHtml}</div></div>`;
+    }
+
+    let html = '<div class="athlete-details-content">';
+
+    // Basic Info
+    html += renderSection('Basic Info', [
+        { key: 'riderId', label: 'Rider ID' },
+        { key: 'name', label: 'Name' },
+        { key: 'gender', label: 'Gender' },
+        { key: 'country', label: 'Country' },
+        { key: 'height', label: 'Height', suffix: 'cm', decimals: 1 },
+        { key: 'weight', label: 'Weight', suffix: 'kg', decimals: 1 }
+    ]);
+
+    // Category & FTP
+    html += renderSection('Category & FTP', [
+        { key: 'zpCategory', label: 'Category' },
+        { key: 'zpFTP', label: 'FTP', suffix: 'W', round: true }
+    ]);
+
+    // Power Model
+    html += renderSection('Power Model', [
+        { key: 'power_CP', label: 'Critical Power', suffix: 'W', round: true },
+        { key: 'power_AWC', label: "W' (AWC)", suffix: 'J', round: true },
+        { key: 'power_powerRating', label: 'Power Rating', decimals: 1 },
+        { key: 'power_compoundScore', label: 'Compound Score', decimals: 1 }
+    ]);
+
+    // Power Bests (Watts)
+    html += renderSection('Power Bests (Watts)', [
+        { key: 'power_w5', label: '5 sec', suffix: 'W', round: true },
+        { key: 'power_w15', label: '15 sec', suffix: 'W', round: true },
+        { key: 'power_w30', label: '30 sec', suffix: 'W', round: true },
+        { key: 'power_w60', label: '1 min', suffix: 'W', round: true },
+        { key: 'power_w120', label: '2 min', suffix: 'W', round: true },
+        { key: 'power_w300', label: '5 min', suffix: 'W', round: true },
+        { key: 'power_w1200', label: '20 min', suffix: 'W', round: true }
+    ]);
+
+    // Power Bests (W/kg)
+    html += renderSection('Power Bests (W/kg)', [
+        { key: 'power_wkg5', label: '5 sec', suffix: 'W/kg', decimals: 2 },
+        { key: 'power_wkg15', label: '15 sec', suffix: 'W/kg', decimals: 2 },
+        { key: 'power_wkg30', label: '30 sec', suffix: 'W/kg', decimals: 2 },
+        { key: 'power_wkg60', label: '1 min', suffix: 'W/kg', decimals: 2 },
+        { key: 'power_wkg120', label: '2 min', suffix: 'W/kg', decimals: 2 },
+        { key: 'power_wkg300', label: '5 min', suffix: 'W/kg', decimals: 2 },
+        { key: 'power_wkg1200', label: '20 min', suffix: 'W/kg', decimals: 2 }
+    ]);
+
+    // Phenotype
+    html += renderSection('Phenotype', [
+        { key: 'phenotype_value', label: 'Type' },
+        { key: 'phenotype_bias', label: 'Bias', decimals: 2 },
+        { key: 'phenotype_scores_sprinter', label: 'Sprinter', decimals: 1 },
+        { key: 'phenotype_scores_puncheur', label: 'Puncheur', decimals: 1 },
+        { key: 'phenotype_scores_pursuiter', label: 'Pursuiter', decimals: 1 },
+        { key: 'phenotype_scores_tt', label: 'TT', decimals: 1 },
+        { key: 'phenotype_scores_climber', label: 'Climber', decimals: 1 }
+    ]);
+
+    // Profile Handicaps
+    const handicapFields = [];
+    if (data.handicaps_profile_flat) handicapFields.push({ key: 'handicaps_profile_flat', label: 'Flat', value: (data.handicaps_profile_flat * 100).toFixed(1) + '%' });
+    if (data.handicaps_profile_rolling) handicapFields.push({ key: 'handicaps_profile_rolling', label: 'Rolling', value: (data.handicaps_profile_rolling * 100).toFixed(1) + '%' });
+    if (data.handicaps_profile_hilly) handicapFields.push({ key: 'handicaps_profile_hilly', label: 'Hilly', value: (data.handicaps_profile_hilly * 100).toFixed(1) + '%' });
+    if (data.handicaps_profile_mountainous) handicapFields.push({ key: 'handicaps_profile_mountainous', label: 'Mountainous', value: (data.handicaps_profile_mountainous * 100).toFixed(1) + '%' });
+
+    if (handicapFields.length > 0) {
+        let handicapHtml = '<div class="details-section"><div class="details-section-title">Profile Suitability</div><div class="details-grid">';
+        for (const field of handicapFields) {
+            handicapHtml += `<div class="details-item"><span class="details-label">${field.label}:</span><span class="details-value">${field.value}</span></div>`;
+        }
+        handicapHtml += '</div></div>';
+        html += handicapHtml;
+    }
+
+    // Race Statistics
+    html += renderSection('Race Statistics', [
+        { key: 'race_finishes', label: 'Finishes' },
+        { key: 'race_wins', label: 'Wins' },
+        { key: 'race_podiums', label: 'Podiums' },
+        { key: 'race_dnfs', label: 'DNFs' }
+    ]);
+
+    // Race Rankings - Current
+    html += renderSection('Current Race Ranking', [
+        { key: 'race_current_rating', label: 'Rating', decimals: 1 },
+        { key: 'race_current_mixed_category', label: 'Mixed Category' },
+        { key: 'race_current_mixed_number', label: 'Mixed Rank' }
+    ]);
+
+    // Metadata
+    let metadataHtml = '';
+    if (data.modified) {
+        metadataHtml += `<div class="details-item"><span class="details-label">Source Updated:</span><span class="details-value">${data.modified}</span></div>`;
+    }
+    if (data.importedAt) {
+        const importDate = new Date(data.importedAt);
+        metadataHtml += `<div class="details-item"><span class="details-label">Imported:</span><span class="details-value">${importDate.toLocaleDateString()} ${importDate.toLocaleTimeString()}</span></div>`;
+    }
+    if (metadataHtml) {
+        html += `<div class="details-section"><div class="details-section-title">Metadata</div><div class="details-grid">${metadataHtml}</div></div>`;
+    }
+
+    html += '</div>';
+    return html;
 }

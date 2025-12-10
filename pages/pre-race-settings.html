@@ -3,7 +3,12 @@
 <head>
     <meta charset="utf-8"/>
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
-    <link rel="stylesheet" href="/pages/css/common.css"/>
+    <meta name="apple-mobile-web-app-capable" content="yes"/>
+
+  <title>PreRace Settings</title>
+
+  <link id="favicon" rel="shortcut icon" href="/pages/images/favicon.png"/>
+  <link rel="stylesheet" href="/pages/css/common.css"/>
     <link rel="stylesheet" href="./css/pre-race.css"/>
     <link rel="stylesheet" href="./css/live-stats.css"/>
 </head>
@@ -21,6 +26,7 @@
 
     <div class="tab-navigation">
         <button type="button" class="tab-btn active" data-tab="settings-tab">Settings</button>
+        <button type="button" class="tab-btn" data-tab="athletes-tab">Known Athletes</button>
         <button type="button" class="tab-btn" data-tab="zwift-tab">GOTTA.BIKE</button>
     </div>
 
@@ -108,6 +114,31 @@
             </section>
         </div>
     </div><!-- end #settings-tab -->
+
+    <div id="athletes-tab" class="tab-panel">
+        <div class="athletes-content">
+            <div class="section">
+                <div class="title">Known Athletes</div>
+                <p class="hint">
+                    Max values are automatically tracked during rides and from GOTTA.BIKE imports. Click values to edit.
+                </p>
+                <div class="athlete-search-bar">
+                    <input type="text" id="athlete-search" placeholder="Search by name, team, or ID..."/>
+                </div>
+                <div id="athlete-max-list"></div>
+            </div>
+
+            <div class="section">
+                <div class="title">Add Athlete Manually</div>
+                <div class="add-rider-form">
+                    <input type="text" id="new-rider-name" placeholder="Name (optional)"/>
+                    <input type="number" id="new-rider-id" placeholder="Athlete ID" min="1"/>
+                    <input type="number" id="new-rider-maxhr" placeholder="Max HR" min="100" max="250"/>
+                    <button type="button" id="add-rider-btn">Add</button>
+                </div>
+            </div>
+        </div>
+    </div><!-- end #athletes-tab -->
 
     <div id="zwift-tab" class="tab-panel">
         <div class="zwift-content">
