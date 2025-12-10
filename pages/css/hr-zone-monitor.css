@@ -1744,3 +1744,221 @@ html.solid-background body {
     font-size: 0.9em;
     padding: 10px 0;
 }
+
+/* Event Viewer Column Configuration */
+.entrants-actions {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+.column-config-btn {
+    padding: 6px 10px;
+    background: #444;
+    color: #aaa;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.column-config-btn:hover {
+    background: #555;
+    color: #fff;
+}
+
+.column-config-btn ms {
+    font-size: 1.2em;
+}
+
+.column-config-panel {
+    padding: 12px;
+    background: rgba(33, 150, 243, 0.1);
+    border: 1px solid rgba(33, 150, 243, 0.3);
+    border-radius: 4px;
+    margin-bottom: 10px;
+}
+
+.column-config-panel[hidden] {
+    display: none;
+}
+
+.column-config-title {
+    font-size: 0.9em;
+    font-weight: 600;
+    color: #fff;
+    margin-bottom: 10px;
+}
+
+.column-checkboxes {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 16px;
+    margin-bottom: 10px;
+}
+
+.column-checkbox-label {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.85em;
+    color: #ccc;
+    cursor: pointer;
+}
+
+.column-checkbox-label input[type="checkbox"] {
+    cursor: pointer;
+}
+
+.column-checkbox-label input[type="checkbox"]:disabled {
+    cursor: not-allowed;
+}
+
+.column-config-actions {
+    margin-top: 8px;
+}
+
+.column-config-actions button {
+    padding: 4px 10px;
+    background: #555;
+    color: #fff;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.8em;
+}
+
+.column-config-actions button:hover {
+    background: #666;
+}
+
+/* Event Viewer Entrant Rows */
+.entrant-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px;
+    border-bottom: 1px solid #333;
+}
+
+.entrant-row:hover {
+    background-color: rgba(255, 255, 255, 0.05);
+}
+
+.entrant-row.has-gotta-data {
+    border-left: 3px solid #4CAF50;
+    padding-left: 5px;
+}
+
+.entrant-header {
+    background: rgba(255, 255, 255, 0.05);
+    border-bottom: 2px solid #444;
+    font-weight: bold;
+    font-size: 0.85em;
+}
+
+.entrant-header:hover {
+    background: rgba(255, 255, 255, 0.05);
+}
+
+.entrant-cell {
+    flex-shrink: 0;
+    min-width: 50px;
+    text-align: center;
+    font-size: 0.9em;
+}
+
+.entrant-cell-name {
+    flex: 1;
+    min-width: 120px;
+    text-align: left;
+    display: flex;
+    flex-direction: column;
+}
+
+.entrant-name {
+    font-weight: 500;
+}
+
+.entrant-id {
+    font-size: 0.75em;
+    color: #888;
+}
+
+.entrant-cell-team {
+    min-width: 80px;
+}
+
+.entrant-cell-country,
+.entrant-cell-gender {
+    min-width: 40px;
+}
+
+.entrant-cell-zpCategory {
+    min-width: 50px;
+}
+
+.entrant-cell-weight,
+.entrant-cell-height,
+.entrant-cell-maxHR,
+.entrant-cell-zpFTP,
+.entrant-cell-power_CP,
+.entrant-cell-power_AWC {
+    min-width: 55px;
+}
+
+.entrant-cell-power_w5,
+.entrant-cell-power_w15,
+.entrant-cell-power_w60,
+.entrant-cell-power_w300,
+.entrant-cell-power_w1200 {
+    min-width: 50px;
+}
+
+/* Sortable header */
+.sortable-header {
+    cursor: pointer;
+    user-select: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+}
+
+.sortable-header:hover {
+    color: #2196F3;
+}
+
+.entrant-cell-name.sortable-header {
+    justify-content: flex-start;
+}
+
+.sort-icon {
+    font-size: 0.9em;
+    color: #2196F3;
+}
+
+/* Entrant input */
+.entrant-input {
+    width: 100%;
+    max-width: 60px;
+    padding: 4px 6px;
+    border: 1px solid #444;
+    border-radius: 4px;
+    background: #333;
+    color: #fff;
+    font-size: 0.85em;
+    text-align: center;
+}
+
+.entrant-input:focus {
+    outline: none;
+    border-color: #2196F3;
+}
+
+.entrant-cell-team .entrant-input {
+    max-width: 80px;
+    text-align: left;
+}

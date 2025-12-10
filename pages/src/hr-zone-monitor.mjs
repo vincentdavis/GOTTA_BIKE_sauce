@@ -264,11 +264,13 @@ function importGottaAthleteData(riderData) {
     // Note: API doesn't provide team, but we could store zpCategory or other fields
 
     // Map power fields to storedMaxPowerData
-    // API: power_w5, power_w15, power_w60, power_w300, power_w1200
+    // API: power_w5, power_w15, power_w30, power_w60, power_w120, power_w300, power_w1200
     const powerMapping = {
         power_w5: '5s',
         power_w15: '15s',
+        power_w30: '30s',
         power_w60: '60s',
+        power_w120: '120s',
         power_w300: '300s',
         power_w1200: '1200s'
     };
@@ -899,6 +901,17 @@ function setupTabNavigation() {
 
 // Event Viewer functions
 async function setupEventViewer() {
+    // Load saved column configuration
+    const savedColumns = common.settingsStore.get(EVENT_VIEWER_COLUMNS_KEY);
+    if (savedColumns && Array.isArray(savedColumns)) {
+        visibleEventColumns = savedColumns;
+    }
+
+    const savedSort = common.settingsStore.get(EVENT_VIEWER_SORT_KEY);
+    if (savedSort) {
+        eventViewerSort = savedSort;
+    }
+
     // Load cached events on startup
     await loadCachedEvents();
 
@@ -907,6 +920,9 @@ async function setupEventViewer() {
     const cachedSelect = document.getElementById('cached-events');
     const subgroupSelect = document.getElementById('subgroup-select');
     const entrantSearch = document.getElementById('entrant-search');
+
+    // Setup column configuration
+    setupColumnConfig();
 
     if (loadBtn) {
         loadBtn.addEventListener('click', () => {
@@ -1023,6 +1039,105 @@ function setGottaBulkImportStatus(state, message) {
     } else {
         statusDiv.textContent = message;
     }
+}
+
+/**
+ * Setup column configuration panel
+ */
+function setupColumnConfig() {
+    const configBtn = document.getElementById('column-config-btn');
+    const configPanel = document.getElementById('column-config-panel');
+    const checkboxContainer = document.getElementById('column-checkboxes');
+    const resetBtn = document.getElementById('reset-columns-btn');
+
+    if (!configBtn || !configPanel || !checkboxContainer) return;
+
+    // Build checkboxes for each available column
+    checkboxContainer.innerHTML = '';
+    for (const col of AVAILABLE_COLUMNS) {
+        const label = document.createElement('label');
+        label.className = 'column-checkbox-label';
+
+        const checkbox = document.createElement('input');
+        checkbox.type = 'checkbox';
+        checkbox.value = col.id;
+        checkbox.checked = visibleEventColumns.includes(col.id);
+
+        // Name column is always required
+        if (col.id === 'name') {
+            checkbox.disabled = true;
+            checkbox.checked = true;
+        }
+
+        checkbox.addEventListener('change', () => {
+            if (checkbox.checked) {
+                if (!visibleEventColumns.includes(col.id)) {
+                    visibleEventColumns.push(col.id);
+                }
+            } else {
+                visibleEventColumns = visibleEventColumns.filter(id => id !== col.id);
+            }
+            common.settingsStore.set(EVENT_VIEWER_COLUMNS_KEY, visibleEventColumns);
+            renderEntrants(document.getElementById('entrant-search')?.value || '');
+        });
+
+        label.appendChild(checkbox);
+        label.appendChild(document.createTextNode(col.label));
+        checkboxContainer.appendChild(label);
+    }
+
+    // Toggle panel visibility
+    configBtn.addEventListener('click', () => {
+        configPanel.hidden = !configPanel.hidden;
+    });
+
+    // Reset to defaults
+    if (resetBtn) {
+        resetBtn.addEventListener('click', () => {
+            visibleEventColumns = [...DEFAULT_VISIBLE_COLUMNS];
+            common.settingsStore.set(EVENT_VIEWER_COLUMNS_KEY, visibleEventColumns);
+
+            // Update checkboxes
+            const checkboxes = checkboxContainer.querySelectorAll('input[type="checkbox"]');
+            checkboxes.forEach(cb => {
+                cb.checked = visibleEventColumns.includes(cb.value) || cb.value === 'name';
+            });
+
+            renderEntrants(document.getElementById('entrant-search')?.value || '');
+        });
+    }
+}
+
+/**
+ * Handle column header click for sorting
+ */
+function handleColumnSort(columnId) {
+    if (eventViewerSort.column === columnId) {
+        eventViewerSort.ascending = !eventViewerSort.ascending;
+    } else {
+        eventViewerSort.column = columnId;
+        eventViewerSort.ascending = true;
+    }
+    common.settingsStore.set(EVENT_VIEWER_SORT_KEY, eventViewerSort);
+    renderEntrants(document.getElementById('entrant-search')?.value || '');
+}
+
+/**
+ * Get sort value for comparison
+ */
+function getSortValue(entrant, columnId) {
+    const col = AVAILABLE_COLUMNS.find(c => c.id === columnId);
+    if (!col) return '';
+
+    const athleteId = entrant.id || entrant.athleteId;
+    const athleteData = storedAthleteData[athleteId];
+    const value = col.getValue(entrant, athleteData);
+
+    // Convert to number for numeric columns
+    if (col.type === 'number' && value !== '') {
+        return parseFloat(value) || 0;
+    }
+    return String(value).toLowerCase();
 }
 
 async function loadCachedEvents() {
@@ -1193,30 +1308,47 @@ function renderEntrants(searchFilter = '') {
 
     container.innerHTML = '';
 
-    let filteredEntrants = currentEntrants;
+    let filteredEntrants = [...currentEntrants];
 
     if (searchFilter) {
         const filterLower = searchFilter.toLowerCase();
-        filteredEntrants = currentEntrants.filter(entrant => {
+        filteredEntrants = filteredEntrants.filter(entrant => {
+            const athleteId = entrant.id || entrant.athleteId;
             const name = getEntrantName(entrant).toLowerCase();
-            const team = (entrant.team || '').toLowerCase();
-            const idStr = String(entrant.id || entrant.athleteId || '');
+            const team = (entrant.team || storedMaxHRData[`team_${athleteId}`] || '').toLowerCase();
+            const idStr = String(athleteId);
             return name.includes(filterLower) || team.includes(filterLower) || idStr.includes(filterLower);
         });
     }
 
-    // Add header row (team column always visible in event viewer)
+    // Get visible columns (ensure name is always first)
+    const columns = AVAILABLE_COLUMNS.filter(col => visibleEventColumns.includes(col.id));
+
+    // Build header row with sortable columns
     const headerRow = document.createElement('div');
-    headerRow.className = 'athlete-max-row athlete-max-header';
-    headerRow.innerHTML = `
-        <div class="athlete-info"><span class="header-label">Athlete</span></div>
-        <span class="header-label team-header">Team</span>
-        <span class="header-label hr-header">HR</span>
-        <div class="power-inputs header-power">
-            ${POWER_COLUMNS.map(col => `<span class="header-label">${col.label}</span>`).join('')}
-        </div>
-        <span class="header-label update-header"></span>
-    `;
+    headerRow.className = 'entrant-row entrant-header';
+
+    for (const col of columns) {
+        const headerCell = document.createElement('div');
+        headerCell.className = `entrant-cell entrant-cell-${col.id} sortable-header`;
+        headerCell.dataset.columnId = col.id;
+
+        const labelSpan = document.createElement('span');
+        labelSpan.textContent = col.label;
+        headerCell.appendChild(labelSpan);
+
+        // Add sort indicator
+        if (eventViewerSort.column === col.id) {
+            const sortIcon = document.createElement('ms');
+            sortIcon.textContent = eventViewerSort.ascending ? 'arrow_upward' : 'arrow_downward';
+            sortIcon.className = 'sort-icon';
+            headerCell.appendChild(sortIcon);
+        }
+
+        headerCell.addEventListener('click', () => handleColumnSort(col.id));
+        headerRow.appendChild(headerCell);
+    }
+
     container.appendChild(headerRow);
 
     if (filteredEntrants.length === 0) {
@@ -1227,175 +1359,115 @@ function renderEntrants(searchFilter = '') {
         return;
     }
 
-    // Sort by name
+    // Sort entrants
     filteredEntrants.sort((a, b) => {
-        return getEntrantName(a).localeCompare(getEntrantName(b));
+        const aVal = getSortValue(a, eventViewerSort.column);
+        const bVal = getSortValue(b, eventViewerSort.column);
+
+        let result;
+        if (typeof aVal === 'number' && typeof bVal === 'number') {
+            result = aVal - bVal;
+        } else {
+            result = String(aVal).localeCompare(String(bVal));
+        }
+
+        return eventViewerSort.ascending ? result : -result;
     });
 
+    // Render each entrant row
     for (const entrant of filteredEntrants) {
         const athleteId = entrant.id || entrant.athleteId;
+        const athleteData = storedAthleteData[athleteId];
         const name = getEntrantName(entrant);
-        const team = entrant.team || '';
-
-        // Get stored values for this athlete
-        const maxHR = storedMaxHRData[athleteId] || '';
         const storedName = storedMaxHRData[`name_${athleteId}`];
         const storedTeam = storedMaxHRData[`team_${athleteId}`];
 
         const row = document.createElement('div');
-        row.className = 'athlete-max-row';
+        row.className = 'entrant-row';
 
-        // Name, team, and ID info
-        const infoDiv = document.createElement('div');
-        infoDiv.className = 'athlete-info';
-
-        const nameSpan = document.createElement('span');
-        nameSpan.className = 'athlete-name';
-        nameSpan.textContent = name;
-        infoDiv.appendChild(nameSpan);
-
-        const metaSpan = document.createElement('span');
-        metaSpan.className = 'athlete-meta';
-        const metaParts = [];
-        const displayTeam = storedTeam || team;
-        if (displayTeam) metaParts.push(displayTeam);
-        metaParts.push(`ID: ${athleteId}`);
-        metaSpan.textContent = metaParts.join(' · ');
-        infoDiv.appendChild(metaSpan);
-
-        // Team input (always visible in event viewer)
-        const teamInput = document.createElement('input');
-        teamInput.type = 'text';
-        teamInput.className = 'team-input';
-        teamInput.value = storedTeam || team;
-        teamInput.placeholder = 'Team';
-        teamInput.title = 'Team name';
-        teamInput.addEventListener('change', (ev) => {
-            const newTeam = ev.target.value.trim();
-            if (newTeam) {
-                storedMaxHRData[`team_${athleteId}`] = newTeam;
-            } else {
-                delete storedMaxHRData[`team_${athleteId}`];
-            }
-            // Also store name if not already stored
-            if (!storedName && name) {
-                storedMaxHRData[`name_${athleteId}`] = name;
-            }
-            saveStoredMaxHRData();
-            // Update the meta span to reflect the change
-            const metaParts = [];
-            if (newTeam) metaParts.push(newTeam);
-            metaParts.push(`ID: ${athleteId}`);
-            metaSpan.textContent = metaParts.join(' · ');
-        });
-
-        // Max HR input
-        const hrInput = document.createElement('input');
-        hrInput.type = 'number';
-        hrInput.className = 'max-value-input';
-        hrInput.value = maxHR;
-        hrInput.min = 100;
-        hrInput.max = 250;
-        hrInput.placeholder = 'HR';
-        hrInput.title = 'Max HR';
-        hrInput.addEventListener('change', (ev) => {
-            const newMaxHR = parseInt(ev.target.value);
-            if (newMaxHR >= 100 && newMaxHR <= 250) {
-                storedMaxHRData[athleteId] = Math.round(newMaxHR);
-                // Also store name and team if not already stored
-                if (!storedName && name) {
-                    storedMaxHRData[`name_${athleteId}`] = name;
-                }
-                if (!storedTeam && team) {
-                    storedMaxHRData[`team_${athleteId}`] = team;
-                }
-                saveStoredMaxHRData();
-            } else if (ev.target.value === '') {
-                delete storedMaxHRData[athleteId];
-                saveStoredMaxHRData();
-            }
-        });
-
-        // Power inputs container
-        const powerInputs = document.createElement('div');
-        powerInputs.className = 'power-inputs';
-
-        for (const col of POWER_COLUMNS) {
-            const powerKey = `${athleteId}_${col.seconds}s`;
-            const powerValue = storedMaxPowerData[powerKey] || '';
-
-            const powerInput = document.createElement('input');
-            powerInput.type = 'number';
-            powerInput.className = 'max-value-input power-input';
-            powerInput.value = powerValue;
-            powerInput.min = 0;
-            powerInput.max = 2500;
-            powerInput.placeholder = col.label;
-            powerInput.title = `Max ${col.label} power`;
-            powerInput.addEventListener('change', (ev) => {
-                const newPower = parseInt(ev.target.value);
-                if (newPower > 0) {
-                    storedMaxPowerData[powerKey] = Math.round(newPower);
-                    // Also store name and team if not already stored
-                    if (!storedName && name) {
-                        storedMaxHRData[`name_${athleteId}`] = name;
-                    }
-                    if (!storedTeam && team) {
-                        storedMaxHRData[`team_${athleteId}`] = team;
-                        saveStoredMaxHRData();
-                    }
-                    saveStoredMaxPowerData();
-                } else if (ev.target.value === '') {
-                    delete storedMaxPowerData[powerKey];
-                    saveStoredMaxPowerData();
-                }
-            });
-            powerInputs.appendChild(powerInput);
+        // Check if we have GOTTA.BIKE data
+        if (athleteData) {
+            row.classList.add('has-gotta-data');
         }
 
-        // Update button (fetch from ZwiftPower)
-        const updateBtn = document.createElement('button');
-        updateBtn.type = 'button';
-        updateBtn.className = 'update-btn';
-        updateBtn.innerHTML = '<ms>sync</ms>';
-        updateBtn.title = 'Update from ZwiftPower';
-        updateBtn.addEventListener('click', async () => {
-            // Get saved credentials
-            const credentials = common.settingsStore.get(ZP_CREDENTIALS_KEY);
-            if (!credentials?.username || !credentials?.password) {
-                alert('Please save your ZwiftPower credentials in the ZwiftPower tab first.');
-                return;
+        for (const col of columns) {
+            const cell = document.createElement('div');
+            cell.className = `entrant-cell entrant-cell-${col.id}`;
+
+            const value = col.getValue(entrant, athleteData);
+
+            if (col.id === 'name') {
+                // Special handling for name column - show name and ID
+                const nameSpan = document.createElement('span');
+                nameSpan.className = 'entrant-name';
+                nameSpan.textContent = value;
+                cell.appendChild(nameSpan);
+
+                const idSpan = document.createElement('span');
+                idSpan.className = 'entrant-id';
+                idSpan.textContent = `ID: ${athleteId}`;
+                cell.appendChild(idSpan);
+            } else if (col.editable) {
+                // Editable field
+                const input = document.createElement('input');
+                input.type = col.type === 'number' ? 'number' : 'text';
+                input.className = 'entrant-input';
+                input.value = value;
+                input.placeholder = col.label;
+
+                if (col.min !== undefined) input.min = col.min;
+                if (col.max !== undefined) input.max = col.max;
+
+                input.addEventListener('change', (ev) => {
+                    const newValue = col.type === 'number' ? parseInt(ev.target.value) : ev.target.value.trim();
+
+                    if (col.id === 'maxHR') {
+                        if (newValue >= 100 && newValue <= 250) {
+                            storedMaxHRData[athleteId] = Math.round(newValue);
+                            if (!storedName && name) storedMaxHRData[`name_${athleteId}`] = name;
+                            saveStoredMaxHRData();
+                        } else if (ev.target.value === '') {
+                            delete storedMaxHRData[athleteId];
+                            saveStoredMaxHRData();
+                        }
+                    } else if (col.id === 'team') {
+                        if (newValue) {
+                            storedMaxHRData[`team_${athleteId}`] = newValue;
+                        } else {
+                            delete storedMaxHRData[`team_${athleteId}`];
+                        }
+                        if (!storedName && name) storedMaxHRData[`name_${athleteId}`] = name;
+                        saveStoredMaxHRData();
+                    } else if (col.powerSeconds) {
+                        const powerKey = `${athleteId}_${col.powerSeconds}s`;
+                        if (newValue > 0) {
+                            storedMaxPowerData[powerKey] = Math.round(newValue);
+                            if (!storedName && name) storedMaxHRData[`name_${athleteId}`] = name;
+                            saveStoredMaxPowerData();
+                            saveStoredMaxHRData();
+                        } else if (ev.target.value === '') {
+                            delete storedMaxPowerData[powerKey];
+                            saveStoredMaxPowerData();
+                        }
+                    }
+                });
+
+                cell.appendChild(input);
+            } else {
+                // Read-only field
+                let displayValue = value;
+                if (col.type === 'number' && value !== '' && value !== null && value !== undefined) {
+                    displayValue = typeof value === 'number' ? Math.round(value) : value;
+                    if (col.suffix) {
+                        displayValue = `${displayValue}`;
+                    }
+                }
+                cell.textContent = displayValue || '-';
             }
 
-            // Check if server is running
-            const serverRunning = await checkZpServer();
-            if (!serverRunning) {
-                alert('ZwiftPower fetch server is not running.\n\nStart it with: node zp-fetch.mjs --server');
-                return;
-            }
+            row.appendChild(cell);
+        }
 
-            // Show loading state
-            updateBtn.disabled = true;
-            updateBtn.innerHTML = '<span class="spinner-inline"></span>';
-
-            try {
-                const profile = await fetchFromServer(athleteId, credentials);
-                displayZpProfile(profile);
-                // Re-render the entrants list to show updated values
-                renderEntrants(document.getElementById('entrant-search')?.value || '');
-            } catch (error) {
-                alert(`Failed to update: ${error.message}`);
-            } finally {
-                updateBtn.disabled = false;
-                updateBtn.innerHTML = '<ms>sync</ms>';
-            }
-        });
-
-        row.appendChild(infoDiv);
-        row.appendChild(teamInput);
-        row.appendChild(hrInput);
-        row.appendChild(powerInputs);
-        row.appendChild(updateBtn);
         container.appendChild(row);
     }
 }
@@ -1483,6 +1555,93 @@ function hideEventError() {
 // Global state for ZwiftPower import
 let currentZpProfile = null;
 let selectedZpFile = null;
+
+// Event Viewer column configuration
+const EVENT_VIEWER_COLUMNS_KEY = '/hr-zone-monitor-event-columns';
+const EVENT_VIEWER_SORT_KEY = '/hr-zone-monitor-event-sort';
+
+// Available columns for Event Viewer
+const AVAILABLE_COLUMNS = [
+    // Basic info
+    { id: 'name', label: 'Name', type: 'text', getValue: (e, data) => getEntrantName(e), editable: false },
+    { id: 'team', label: 'Team', type: 'text', getValue: (e, data) => data?.team || e.team || '', editable: true, storageKey: 'team' },
+    { id: 'country', label: 'Country', type: 'text', getValue: (e, data) => data?.country || '', editable: false },
+    { id: 'gender', label: 'Gender', type: 'text', getValue: (e, data) => data?.gender || '', editable: false },
+    { id: 'maxHR', label: 'Max HR', type: 'number', getValue: (e, data) => storedMaxHRData[e.id || e.athleteId] || '', editable: true, min: 100, max: 250 },
+    { id: 'weight', label: 'Weight', type: 'number', getValue: (e, data) => data?.weight || '', suffix: 'kg', editable: false },
+    { id: 'height', label: 'Height', type: 'number', getValue: (e, data) => data?.height || '', suffix: 'cm', editable: false },
+
+    // Category & FTP
+    { id: 'zpCategory', label: 'Category', type: 'text', getValue: (e, data) => data?.zpCategory || '', editable: false },
+    { id: 'zpFTP', label: 'FTP', type: 'number', getValue: (e, data) => data?.zpFTP || '', suffix: 'W', editable: false },
+
+    // Critical Power model
+    { id: 'power_CP', label: 'CP', type: 'number', getValue: (e, data) => data?.power_CP || '', suffix: 'W', editable: false },
+    { id: 'power_AWC', label: "W'", type: 'number', getValue: (e, data) => data?.power_AWC || '', suffix: 'J', editable: false },
+
+    // Power durations (watts)
+    { id: 'power_w5', label: '5s', type: 'number', getValue: (e, data) => data?.power_w5 || storedMaxPowerData[`${e.id || e.athleteId}_5s`] || '', suffix: 'W', editable: true, powerSeconds: 5 },
+    { id: 'power_w15', label: '15s', type: 'number', getValue: (e, data) => data?.power_w15 || storedMaxPowerData[`${e.id || e.athleteId}_15s`] || '', suffix: 'W', editable: true, powerSeconds: 15 },
+    { id: 'power_w30', label: '30s', type: 'number', getValue: (e, data) => data?.power_w30 || storedMaxPowerData[`${e.id || e.athleteId}_30s`] || '', suffix: 'W', editable: true, powerSeconds: 30 },
+    { id: 'power_w60', label: '1m', type: 'number', getValue: (e, data) => data?.power_w60 || storedMaxPowerData[`${e.id || e.athleteId}_60s`] || '', suffix: 'W', editable: true, powerSeconds: 60 },
+    { id: 'power_w120', label: '2m', type: 'number', getValue: (e, data) => data?.power_w120 || storedMaxPowerData[`${e.id || e.athleteId}_120s`] || '', suffix: 'W', editable: true, powerSeconds: 120 },
+    { id: 'power_w300', label: '5m', type: 'number', getValue: (e, data) => data?.power_w300 || storedMaxPowerData[`${e.id || e.athleteId}_300s`] || '', suffix: 'W', editable: true, powerSeconds: 300 },
+    { id: 'power_w1200', label: '20m', type: 'number', getValue: (e, data) => data?.power_w1200 || storedMaxPowerData[`${e.id || e.athleteId}_1200s`] || '', suffix: 'W', editable: true, powerSeconds: 1200 },
+
+    // Power durations (w/kg)
+    { id: 'power_wkg5', label: '5s W/kg', type: 'number', getValue: (e, data) => data?.power_wkg5 ? data.power_wkg5.toFixed(2) : '', suffix: '', editable: false },
+    { id: 'power_wkg15', label: '15s W/kg', type: 'number', getValue: (e, data) => data?.power_wkg15 ? data.power_wkg15.toFixed(2) : '', suffix: '', editable: false },
+    { id: 'power_wkg30', label: '30s W/kg', type: 'number', getValue: (e, data) => data?.power_wkg30 ? data.power_wkg30.toFixed(2) : '', suffix: '', editable: false },
+    { id: 'power_wkg60', label: '1m W/kg', type: 'number', getValue: (e, data) => data?.power_wkg60 ? data.power_wkg60.toFixed(2) : '', suffix: '', editable: false },
+    { id: 'power_wkg120', label: '2m W/kg', type: 'number', getValue: (e, data) => data?.power_wkg120 ? data.power_wkg120.toFixed(2) : '', suffix: '', editable: false },
+    { id: 'power_wkg300', label: '5m W/kg', type: 'number', getValue: (e, data) => data?.power_wkg300 ? data.power_wkg300.toFixed(2) : '', suffix: '', editable: false },
+    { id: 'power_wkg1200', label: '20m W/kg', type: 'number', getValue: (e, data) => data?.power_wkg1200 ? data.power_wkg1200.toFixed(2) : '', suffix: '', editable: false },
+
+    // Power ratings
+    { id: 'power_powerRating', label: 'Power Rating', type: 'number', getValue: (e, data) => data?.power_powerRating || '', suffix: '', editable: false },
+    { id: 'power_compoundScore', label: 'Compound Score', type: 'number', getValue: (e, data) => data?.power_compoundScore || '', suffix: '', editable: false },
+
+    // Phenotype
+    { id: 'phenotype_value', label: 'Phenotype', type: 'text', getValue: (e, data) => data?.phenotype_value || '', editable: false },
+    { id: 'phenotype_bias', label: 'Pheno Bias', type: 'number', getValue: (e, data) => data?.phenotype_bias ? data.phenotype_bias.toFixed(2) : '', suffix: '', editable: false },
+    { id: 'phenotype_scores_sprinter', label: 'Sprinter', type: 'number', getValue: (e, data) => data?.phenotype_scores_sprinter ? data.phenotype_scores_sprinter.toFixed(1) : '', suffix: '', editable: false },
+    { id: 'phenotype_scores_puncheur', label: 'Puncheur', type: 'number', getValue: (e, data) => data?.phenotype_scores_puncheur ? data.phenotype_scores_puncheur.toFixed(1) : '', suffix: '', editable: false },
+    { id: 'phenotype_scores_pursuiter', label: 'Pursuiter', type: 'number', getValue: (e, data) => data?.phenotype_scores_pursuiter ? data.phenotype_scores_pursuiter.toFixed(1) : '', suffix: '', editable: false },
+    { id: 'phenotype_scores_tt', label: 'TT', type: 'number', getValue: (e, data) => data?.phenotype_scores_tt ? data.phenotype_scores_tt.toFixed(1) : '', suffix: '', editable: false },
+    { id: 'phenotype_scores_climber', label: 'Climber', type: 'number', getValue: (e, data) => data?.phenotype_scores_climber ? data.phenotype_scores_climber.toFixed(1) : '', suffix: '', editable: false },
+
+    // Handicaps (profile suitability)
+    { id: 'handicaps_profile_flat', label: 'Flat %', type: 'number', getValue: (e, data) => data?.handicaps_profile_flat ? (data.handicaps_profile_flat * 100).toFixed(1) : '', suffix: '%', editable: false },
+    { id: 'handicaps_profile_rolling', label: 'Rolling %', type: 'number', getValue: (e, data) => data?.handicaps_profile_rolling ? (data.handicaps_profile_rolling * 100).toFixed(1) : '', suffix: '%', editable: false },
+    { id: 'handicaps_profile_hilly', label: 'Hilly %', type: 'number', getValue: (e, data) => data?.handicaps_profile_hilly ? (data.handicaps_profile_hilly * 100).toFixed(1) : '', suffix: '%', editable: false },
+    { id: 'handicaps_profile_mountainous', label: 'Mountain %', type: 'number', getValue: (e, data) => data?.handicaps_profile_mountainous ? (data.handicaps_profile_mountainous * 100).toFixed(1) : '', suffix: '%', editable: false },
+
+    // Race stats
+    { id: 'race_finishes', label: 'Finishes', type: 'number', getValue: (e, data) => data?.race_finishes || '', suffix: '', editable: false },
+    { id: 'race_wins', label: 'Wins', type: 'number', getValue: (e, data) => data?.race_wins || '', suffix: '', editable: false },
+    { id: 'race_podiums', label: 'Podiums', type: 'number', getValue: (e, data) => data?.race_podiums || '', suffix: '', editable: false },
+    { id: 'race_dnfs', label: 'DNFs', type: 'number', getValue: (e, data) => data?.race_dnfs || '', suffix: '', editable: false },
+
+    // Race rankings - Current
+    { id: 'race_current_rating', label: 'Current Rating', type: 'number', getValue: (e, data) => data?.race_current_rating || '', suffix: '', editable: false },
+    { id: 'race_current_mixed_category', label: 'Current Cat', type: 'text', getValue: (e, data) => data?.race_current_mixed_category || '', editable: false },
+    { id: 'race_current_mixed_number', label: 'Current #', type: 'number', getValue: (e, data) => data?.race_current_mixed_number || '', suffix: '', editable: false },
+
+    // Race rankings - Max 30 days
+    { id: 'race_max30_rating', label: 'Max30 Rating', type: 'number', getValue: (e, data) => data?.race_max30_rating || '', suffix: '', editable: false },
+    { id: 'race_max30_mixed_category', label: 'Max30 Cat', type: 'text', getValue: (e, data) => data?.race_max30_mixed_category || '', editable: false },
+
+    // Race rankings - Max 90 days
+    { id: 'race_max90_rating', label: 'Max90 Rating', type: 'number', getValue: (e, data) => data?.race_max90_rating || '', suffix: '', editable: false },
+    { id: 'race_max90_mixed_category', label: 'Max90 Cat', type: 'text', getValue: (e, data) => data?.race_max90_mixed_category || '', editable: false }
+];
+
+// Default visible columns
+const DEFAULT_VISIBLE_COLUMNS = ['name', 'team', 'zpCategory', 'zpFTP', 'power_w60', 'power_w300', 'power_w1200'];
+
+// Current sort state
+let eventViewerSort = { column: 'name', ascending: true };
+let visibleEventColumns = [...DEFAULT_VISIBLE_COLUMNS];
 
 // Storage key for ZwiftPower credentials
 const ZP_CREDENTIALS_KEY = '/hr-zone-monitor-zp-credentials';
@@ -2737,119 +2896,164 @@ function renderAthleteMaxList(searchFilter = '') {
  * Render the details panel HTML for an athlete
  */
 function renderAthleteDetailsPanel(athleteId, data) {
+    // Helper to render a section
+    function renderSection(title, fields) {
+        let sectionHtml = '';
+        let hasContent = false;
+
+        for (const field of fields) {
+            const value = data[field.key];
+            if (value !== undefined && value !== null && value !== '' && value !== 0) {
+                hasContent = true;
+                let displayValue = value;
+                if (typeof value === 'number') {
+                    if (field.decimals !== undefined) {
+                        displayValue = value.toFixed(field.decimals);
+                    } else if (field.round) {
+                        displayValue = Math.round(value);
+                    }
+                }
+                if (field.suffix) {
+                    displayValue += ` ${field.suffix}`;
+                }
+                sectionHtml += `<div class="details-item"><span class="details-label">${field.label}:</span><span class="details-value">${displayValue}</span></div>`;
+            }
+        }
+
+        if (!hasContent) return '';
+        return `<div class="details-section"><div class="details-section-title">${title}</div><div class="details-grid">${sectionHtml}</div></div>`;
+    }
+
     let html = '<div class="athlete-details-content">';
 
     // Basic Info
-    html += '<div class="details-section">';
-    html += '<div class="details-section-title">Basic Info</div>';
-    html += '<div class="details-grid">';
-
-    const basicFields = [
+    html += renderSection('Basic Info', [
         { key: 'riderId', label: 'Rider ID' },
         { key: 'name', label: 'Name' },
         { key: 'gender', label: 'Gender' },
         { key: 'country', label: 'Country' },
         { key: 'height', label: 'Height', suffix: 'cm', decimals: 1 },
         { key: 'weight', label: 'Weight', suffix: 'kg', decimals: 1 }
-    ];
+    ]);
 
-    for (const field of basicFields) {
-        const value = data[field.key];
-        if (value !== undefined && value !== null && value !== '') {
-            let displayValue = value;
-            if (typeof value === 'number' && field.decimals !== undefined) {
-                displayValue = value.toFixed(field.decimals);
-            }
-            if (field.suffix) {
-                displayValue += ` ${field.suffix}`;
-            }
-            html += `<div class="details-item"><span class="details-label">${field.label}:</span><span class="details-value">${displayValue}</span></div>`;
-        }
-    }
-    html += '</div></div>';
-
-    // ZwiftPower Data
-    html += '<div class="details-section">';
-    html += '<div class="details-section-title">ZwiftPower</div>';
-    html += '<div class="details-grid">';
-
-    const zpFields = [
+    // Category & FTP
+    html += renderSection('Category & FTP', [
         { key: 'zpCategory', label: 'Category' },
-        { key: 'zpFTP', label: 'FTP', suffix: 'W', decimals: 0 }
-    ];
-
-    for (const field of zpFields) {
-        const value = data[field.key];
-        if (value !== undefined && value !== null && value !== '') {
-            let displayValue = value;
-            if (typeof value === 'number' && field.decimals !== undefined) {
-                displayValue = value.toFixed(field.decimals);
-            }
-            if (field.suffix) {
-                displayValue += ` ${field.suffix}`;
-            }
-            html += `<div class="details-item"><span class="details-label">${field.label}:</span><span class="details-value">${displayValue}</span></div>`;
-        }
-    }
-    html += '</div></div>';
+        { key: 'zpFTP', label: 'FTP', suffix: 'W', round: true }
+    ]);
 
     // Power Model
-    html += '<div class="details-section">';
-    html += '<div class="details-section-title">Power Model</div>';
-    html += '<div class="details-grid">';
+    html += renderSection('Power Model', [
+        { key: 'power_CP', label: 'Critical Power', suffix: 'W', round: true },
+        { key: 'power_AWC', label: "W' (AWC)", suffix: 'J', round: true },
+        { key: 'power_powerRating', label: 'Power Rating', decimals: 1 },
+        { key: 'power_compoundScore', label: 'Compound Score', decimals: 1 }
+    ]);
 
-    const powerModelFields = [
-        { key: 'power_CP', label: 'Critical Power', suffix: 'W', decimals: 0 },
-        { key: 'power_AWC', label: "W' (AWC)", suffix: 'J', decimals: 0 }
-    ];
+    // Power Bests (Watts)
+    html += renderSection('Power Bests (Watts)', [
+        { key: 'power_w5', label: '5 sec', suffix: 'W', round: true },
+        { key: 'power_w15', label: '15 sec', suffix: 'W', round: true },
+        { key: 'power_w30', label: '30 sec', suffix: 'W', round: true },
+        { key: 'power_w60', label: '1 min', suffix: 'W', round: true },
+        { key: 'power_w120', label: '2 min', suffix: 'W', round: true },
+        { key: 'power_w300', label: '5 min', suffix: 'W', round: true },
+        { key: 'power_w1200', label: '20 min', suffix: 'W', round: true }
+    ]);
 
-    for (const field of powerModelFields) {
-        const value = data[field.key];
-        if (value !== undefined && value !== null && value > 0) {
-            let displayValue = Math.round(value);
-            if (field.suffix) {
-                displayValue += ` ${field.suffix}`;
-            }
-            html += `<div class="details-item"><span class="details-label">${field.label}:</span><span class="details-value">${displayValue}</span></div>`;
+    // Power Bests (W/kg)
+    html += renderSection('Power Bests (W/kg)', [
+        { key: 'power_wkg5', label: '5 sec', suffix: 'W/kg', decimals: 2 },
+        { key: 'power_wkg15', label: '15 sec', suffix: 'W/kg', decimals: 2 },
+        { key: 'power_wkg30', label: '30 sec', suffix: 'W/kg', decimals: 2 },
+        { key: 'power_wkg60', label: '1 min', suffix: 'W/kg', decimals: 2 },
+        { key: 'power_wkg120', label: '2 min', suffix: 'W/kg', decimals: 2 },
+        { key: 'power_wkg300', label: '5 min', suffix: 'W/kg', decimals: 2 },
+        { key: 'power_wkg1200', label: '20 min', suffix: 'W/kg', decimals: 2 }
+    ]);
+
+    // Phenotype
+    html += renderSection('Phenotype', [
+        { key: 'phenotype_value', label: 'Type' },
+        { key: 'phenotype_bias', label: 'Bias', decimals: 2 },
+        { key: 'phenotype_scores_sprinter', label: 'Sprinter', decimals: 1 },
+        { key: 'phenotype_scores_puncheur', label: 'Puncheur', decimals: 1 },
+        { key: 'phenotype_scores_pursuiter', label: 'Pursuiter', decimals: 1 },
+        { key: 'phenotype_scores_tt', label: 'TT', decimals: 1 },
+        { key: 'phenotype_scores_climber', label: 'Climber', decimals: 1 }
+    ]);
+
+    // Profile Handicaps (convert to percentage for display)
+    const handicapFields = [];
+    if (data.handicaps_profile_flat) handicapFields.push({ key: 'handicaps_profile_flat', label: 'Flat', value: (data.handicaps_profile_flat * 100).toFixed(1) + '%' });
+    if (data.handicaps_profile_rolling) handicapFields.push({ key: 'handicaps_profile_rolling', label: 'Rolling', value: (data.handicaps_profile_rolling * 100).toFixed(1) + '%' });
+    if (data.handicaps_profile_hilly) handicapFields.push({ key: 'handicaps_profile_hilly', label: 'Hilly', value: (data.handicaps_profile_hilly * 100).toFixed(1) + '%' });
+    if (data.handicaps_profile_mountainous) handicapFields.push({ key: 'handicaps_profile_mountainous', label: 'Mountainous', value: (data.handicaps_profile_mountainous * 100).toFixed(1) + '%' });
+
+    if (handicapFields.length > 0) {
+        let handicapHtml = '<div class="details-section"><div class="details-section-title">Profile Suitability</div><div class="details-grid">';
+        for (const field of handicapFields) {
+            handicapHtml += `<div class="details-item"><span class="details-label">${field.label}:</span><span class="details-value">${field.value}</span></div>`;
         }
+        handicapHtml += '</div></div>';
+        html += handicapHtml;
     }
-    html += '</div></div>';
 
-    // Power Bests
-    html += '<div class="details-section">';
-    html += '<div class="details-section-title">Power Bests</div>';
-    html += '<div class="details-grid">';
+    // Race Statistics
+    html += renderSection('Race Statistics', [
+        { key: 'race_finishes', label: 'Finishes' },
+        { key: 'race_wins', label: 'Wins' },
+        { key: 'race_podiums', label: 'Podiums' },
+        { key: 'race_dnfs', label: 'DNFs' }
+    ]);
 
-    const powerFields = [
-        { key: 'power_w5', label: '5 sec' },
-        { key: 'power_w15', label: '15 sec' },
-        { key: 'power_w60', label: '1 min' },
-        { key: 'power_w300', label: '5 min' },
-        { key: 'power_w1200', label: '20 min' }
-    ];
+    // Race Rankings - Current
+    html += renderSection('Current Race Ranking', [
+        { key: 'race_current_rating', label: 'Rating', decimals: 1 },
+        { key: 'race_current_mixed_category', label: 'Mixed Category' },
+        { key: 'race_current_mixed_number', label: 'Mixed Rank' },
+        { key: 'race_current_womens_category', label: 'Womens Category' },
+        { key: 'race_current_womens_number', label: 'Womens Rank' }
+    ]);
 
-    for (const field of powerFields) {
-        const value = data[field.key];
-        if (value !== undefined && value !== null && value > 0) {
-            html += `<div class="details-item"><span class="details-label">${field.label}:</span><span class="details-value">${Math.round(value)} W</span></div>`;
-        }
-    }
-    html += '</div></div>';
+    // Race Rankings - Max 30 days
+    html += renderSection('Max 30-Day Ranking', [
+        { key: 'race_max30_rating', label: 'Rating', decimals: 1 },
+        { key: 'race_max30_mixed_category', label: 'Mixed Category' },
+        { key: 'race_max30_mixed_number', label: 'Mixed Rank' },
+        { key: 'race_max30_womens_category', label: 'Womens Category' },
+        { key: 'race_max30_womens_number', label: 'Womens Rank' }
+    ]);
+
+    // Race Rankings - Max 90 days
+    html += renderSection('Max 90-Day Ranking', [
+        { key: 'race_max90_rating', label: 'Rating', decimals: 1 },
+        { key: 'race_max90_mixed_category', label: 'Mixed Category' },
+        { key: 'race_max90_mixed_number', label: 'Mixed Rank' },
+        { key: 'race_max90_womens_category', label: 'Womens Category' },
+        { key: 'race_max90_womens_numbe', label: 'Womens Rank' }
+    ]);
+
+    // Race Rankings - Last
+    html += renderSection('Last Race Ranking', [
+        { key: 'race_last_rating', label: 'Rating', decimals: 1 },
+        { key: 'race_last_mixed_category', label: 'Mixed Category' },
+        { key: 'race_last_mixed_number', label: 'Mixed Rank' },
+        { key: 'race_last_womens_category', label: 'Womens Category' },
+        { key: 'race_last_womens_number', label: 'Womens Rank' }
+    ]);
 
     // Metadata
-    if (data.modified || data.importedAt) {
-        html += '<div class="details-section">';
-        html += '<div class="details-section-title">Metadata</div>';
-        html += '<div class="details-grid">';
-
-        if (data.modified) {
-            html += `<div class="details-item"><span class="details-label">Source Updated:</span><span class="details-value">${data.modified}</span></div>`;
-        }
-        if (data.importedAt) {
-            const importDate = new Date(data.importedAt);
-            html += `<div class="details-item"><span class="details-label">Imported:</span><span class="details-value">${importDate.toLocaleDateString()} ${importDate.toLocaleTimeString()}</span></div>`;
-        }
-        html += '</div></div>';
+    let metadataHtml = '';
+    if (data.modified) {
+        metadataHtml += `<div class="details-item"><span class="details-label">Source Updated:</span><span class="details-value">${data.modified}</span></div>`;
+    }
+    if (data.importedAt) {
+        const importDate = new Date(data.importedAt);
+        metadataHtml += `<div class="details-item"><span class="details-label">Imported:</span><span class="details-value">${importDate.toLocaleDateString()} ${importDate.toLocaleTimeString()}</span></div>`;
+    }
+    if (metadataHtml) {
+        html += `<div class="details-section"><div class="details-section-title">Metadata</div><div class="details-grid">${metadataHtml}</div></div>`;
     }
 
     html += '</div>';

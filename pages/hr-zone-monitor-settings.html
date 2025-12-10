@@ -292,11 +292,23 @@
                     <div id="entrants-section" hidden>
                         <div class="entrants-header">
                             <h3>Entrants (<span id="entrant-count">0</span>)</h3>
-                            <button type="button" id="gotta-bulk-import-btn" class="gotta-bulk-import-btn">
-                                Import Data
-                            </button>
+                            <div class="entrants-actions">
+                                <button type="button" id="gotta-bulk-import-btn" class="gotta-bulk-import-btn">
+                                    Import Data
+                                </button>
+                                <button type="button" id="column-config-btn" class="column-config-btn" title="Configure columns">
+                                    <ms>view_column</ms>
+                                </button>
+                            </div>
                         </div>
                         <div id="gotta-bulk-import-status" class="gotta-bulk-import-status"></div>
+                        <div id="column-config-panel" class="column-config-panel" hidden>
+                            <div class="column-config-title">Select Columns to Display</div>
+                            <div id="column-checkboxes" class="column-checkboxes"></div>
+                            <div class="column-config-actions">
+                                <button type="button" id="reset-columns-btn">Reset to Default</button>
+                            </div>
+                        </div>
                         <div class="search-bar">
                             <input type="text" id="entrant-search" placeholder="Search by name..."/>
                         </div>
