@@ -27,8 +27,11 @@ let heatmapChart = null;
 let currentSort = { column: 'wkg60', ascending: false };
 
 // All available columns for the heatmap
-// Categories: power_watts, power_wkg, power_model, profile, race_stats, race_ranking, physical
+// Categories: info, power_watts, power_wkg, power_model, profile, race_stats, race_ranking, physical
 const AVAILABLE_COLUMNS = [
+    // Info (text columns - no heatmap coloring)
+    { id: 'team', label: 'Team', category: 'info', dataKey: 'team', format: 'text' },
+
     // Power (Watts)
     { id: 'w5', label: '5s W', category: 'power_watts', dataKey: 'power_w5', format: 'watts' },
     { id: 'w15', label: '15s W', category: 'power_watts', dataKey: 'power_w15', format: 'watts' },
@@ -85,6 +88,7 @@ const AVAILABLE_COLUMNS = [
 
 // Column categories for grouping in UI
 const COLUMN_CATEGORIES = {
+    info: 'Info',
     power_watts: 'Power (Watts)',
     power_wkg: 'Power (W/kg)',
     power_model: 'Power Model',
@@ -870,6 +874,8 @@ function getSelectedColumns() {
 function formatColumnValue(value, col) {
     if (value === null || value === undefined) return '';
     switch (col.format) {
+        case 'text':
+            return String(value);
         case 'watts':
             return Math.round(value);
         case 'wkg':
@@ -933,8 +939,13 @@ function renderHeatmap() {
     document.getElementById('no-data').hidden = true;
 
     // Calculate column statistics (min, max, median) for color scaling
+    // Skip text columns - they don't have numeric stats
     const columnStats = {};
     for (const col of visibleColumns) {
+        if (col.format === 'text') {
+            columnStats[col.id] = null; // No stats for text columns
+            continue;
+        }
         const values = riders
             .map(r => r.athleteData[col.dataKey])
             .filter(v => v !== undefined && v !== null && v > 0)
@@ -958,6 +969,19 @@ function renderHeatmap() {
     const series = riders.map(rider => {
         const data = visibleColumns.map(col => {
             const rawValue = rider.athleteData[col.dataKey];
+
+            // Handle text columns differently - no color scaling
+            if (col.format === 'text') {
+                return {
+                    x: col.label,
+                    y: -0.5, // Neutral value for gray color
+                    rawValue: rawValue || '',
+                    colId: col.id,
+                    colFormat: col.format,
+                    colSuffix: col.suffix || ''
+                };
+            }
+
             const value = rawValue !== undefined && rawValue !== null ? Number(rawValue) : null;
 
             // Normalize value to 0-100 scale based on column stats
@@ -1021,7 +1045,7 @@ function renderHeatmap() {
                 // Get the raw value from the data
                 const dataPoint = opts.w.config.series[opts.seriesIndex].data[opts.dataPointIndex];
                 const rawValue = dataPoint?.rawValue;
-                if (rawValue === null || rawValue === undefined) return '';
+                if (rawValue === null || rawValue === undefined || rawValue === '') return '';
                 const col = visibleColumns[opts.dataPointIndex];
                 return formatColumnValue(rawValue, col);
             }
