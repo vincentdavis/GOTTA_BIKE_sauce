@@ -859,6 +859,7 @@ async function bulkImportFromGotta(athleteIds, progressCallback) {
 
     console.log('[PreRace] All batches complete, saving data');
     saveStoredAthleteData();
+    saveStoredMaxHRData();  // Save name/team data for Known Athletes list
     console.log('[PreRace] Data saved, returning results');
     return results;
 }
@@ -866,6 +867,7 @@ async function bulkImportFromGotta(athleteIds, progressCallback) {
 /**
  * Import single athlete data from API response
  * Uses spread operator to preserve ALL fields from API (matches live-stats.mjs)
+ * Also updates storedMaxHRData so athlete appears in Known Athletes list
  */
 function importAthleteData(riderData) {
     if (!riderData || !riderData.riderId) return;
@@ -883,6 +885,15 @@ function importAthleteData(riderData) {
         // Add import timestamp
         importedAt: Date.now()
     };
+
+    // Also update storedMaxHRData with name/team so athlete appears in Known Athletes list
+    // Only set if not already set (preserve user edits)
+    if (riderData.name && !storedMaxHRData[`name_${athleteId}`]) {
+        storedMaxHRData[`name_${athleteId}`] = riderData.name;
+    }
+    if (riderData.team && !storedMaxHRData[`team_${athleteId}`]) {
+        storedMaxHRData[`team_${athleteId}`] = riderData.team;
+    }
 }
 
 /**
@@ -1015,11 +1026,14 @@ function buildTableBody(riders, visibleColumns, columnStats) {
     for (const rider of riders) {
         const tr = document.createElement('tr');
 
-        // Rider name cell
+        // Rider name cell - clickable to show details
         const nameTd = document.createElement('td');
-        nameTd.className = 'rider-name';
+        nameTd.className = 'rider-name clickable';
         nameTd.textContent = rider.name;
-        nameTd.title = rider.name; // Full name on hover
+        nameTd.title = 'Click to view all data';
+        nameTd.dataset.riderId = rider.id;
+        nameTd.dataset.riderName = rider.name;
+        nameTd.onclick = () => showRiderModal(rider.id, rider.name);
         tr.appendChild(nameTd);
 
         // Metric cells
@@ -1149,6 +1163,78 @@ function setupCellTooltips(container, visibleColumns, columnStats) {
             tooltip.hidden = true;
         });
     });
+}
+
+/**
+ * Show modal with full rider details
+ */
+function showRiderModal(riderId, riderName) {
+    const modal = document.getElementById('rider-modal');
+    if (!modal) return;
+
+    const titleEl = modal.querySelector('.rider-modal-title');
+    const bodyEl = modal.querySelector('.rider-modal-body');
+    const closeBtn = modal.querySelector('.rider-modal-close');
+
+    // Set title
+    titleEl.textContent = riderName;
+
+    // Build profile links container
+    const profileLinksHtml = `
+        <div class="rider-profile-links">
+            <a href="#" class="external-link" data-url="https://zwiftpower.com/profile.php?z=${riderId}">ZwiftPower</a>
+            <a href="#" class="external-link" data-url="https://www.zwiftracing.app/riders/${riderId}">Zwift Racing</a>
+        </div>
+    `;
+
+    // Get rider data
+    const athleteData = storedAthleteData[riderId];
+
+    if (athleteData) {
+        bodyEl.innerHTML = profileLinksHtml + renderAthleteDetailsPanel(riderId, athleteData);
+    } else {
+        bodyEl.innerHTML = profileLinksHtml + '<div class="no-gotta-data">No extended data available. Import from GOTTA.BIKE to see additional fields.</div>';
+    }
+
+    // Add click handlers for external links to open in system browser
+    bodyEl.querySelectorAll('.external-link').forEach(link => {
+        link.onclick = (e) => {
+            e.preventDefault();
+            const url = link.dataset.url;
+            if (url && common.rpc.openExternalLink) {
+                common.rpc.openExternalLink(url);
+            } else {
+                // Fallback to window.open if RPC not available
+                window.open(url, '_blank');
+            }
+        };
+    });
+
+    // Show modal
+    modal.hidden = false;
+
+    // Close handlers
+    const closeModal = () => {
+        modal.hidden = true;
+    };
+
+    closeBtn.onclick = closeModal;
+
+    // Close on overlay click (but not modal content click)
+    modal.onclick = (e) => {
+        if (e.target === modal) {
+            closeModal();
+        }
+    };
+
+    // Close on Escape key
+    const handleKeydown = (e) => {
+        if (e.key === 'Escape') {
+            closeModal();
+            document.removeEventListener('keydown', handleKeydown);
+        }
+    };
+    document.addEventListener('keydown', handleKeydown);
 }
 
 /**
