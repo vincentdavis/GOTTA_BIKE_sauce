@@ -868,3 +868,58 @@ body:not(.transparent-bg) {
     width: 100% !important;
     height: auto !important;
 }
+
+/* Share Button */
+#share-btn {
+    cursor: pointer;
+    transition: opacity 0.2s;
+}
+
+#share-btn:hover {
+    opacity: 0.8;
+}
+
+#share-btn.sharing {
+    opacity: 0.5;
+    pointer-events: none;
+}
+
+#share-btn.sharing ms {
+    animation: pulse 1s infinite;
+}
+
+@keyframes pulse {
+    0%, 100% { opacity: 0.5; }
+    50% { opacity: 1; }
+}
+
+/* Share Feedback Toast */
+.share-feedback {
+    position: fixed;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%) translateY(20px);
+    padding: 10px 20px;
+    border-radius: 6px;
+    font-size: 14px;
+    font-weight: 500;
+    z-index: 9999;
+    opacity: 0;
+    transition: opacity 0.3s, transform 0.3s;
+    pointer-events: none;
+}
+
+.share-feedback.visible {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+}
+
+.share-feedback-success {
+    background: #2e7d32;
+    color: #fff;
+}
+
+.share-feedback-error {
+    background: #c62828;
+    color: #fff;
+}

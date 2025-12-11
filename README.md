@@ -11,6 +11,8 @@ A Sauce4Zwift mod with features focused on pre-race strategy planning and live r
 - Integration with GOTTA.BIKE for detailed athlete data
 
 ### PreRace Heatmap Window
+<img src="images/PreRace_example.png" alt="PreRace example" style="max-width: 600px; width: 25%;">
+
 - Pre-race analysis heatmap showing event entrants' power data
 - 38 customizable columns including:
   - Power (watts and W/kg for various durations)

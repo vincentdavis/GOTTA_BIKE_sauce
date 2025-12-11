@@ -132,8 +132,130 @@ common.settingsStore.setDefault({
 /**
  * Main entry point for PreRace window
  */
+/**
+ * Capture the content area and copy to clipboard as an image
+ */
+async function captureAndShare() {
+    const shareBtn = document.getElementById('share-btn');
+    const content = document.getElementById('content');
+
+    if (!content || !window.html2canvas) {
+        console.error('Cannot capture: content not found or html2canvas not loaded');
+        return;
+    }
+
+    // Show loading state
+    const originalTitle = shareBtn?.getAttribute('title');
+    if (shareBtn) {
+        shareBtn.classList.add('sharing');
+        shareBtn.setAttribute('title', 'Capturing...');
+    }
+
+    try {
+        // Store original styles
+        const originalStyles = {
+            height: content.style.height,
+            maxHeight: content.style.maxHeight,
+            overflow: content.style.overflow,
+            background: content.style.background
+        };
+
+        // Get background color
+        const computedBg = getComputedStyle(document.body).getPropertyValue('--background-color') || '#000000';
+
+        // Temporarily expand content to full height for capture
+        content.style.height = 'auto';
+        content.style.maxHeight = 'none';
+        content.style.overflow = 'visible';
+        content.style.background = computedBg;
+
+        // Scroll to top to ensure consistent capture
+        content.scrollTop = 0;
+
+        // Wait for layout to settle
+        await new Promise(resolve => setTimeout(resolve, 100));
+
+        // Capture the full content
+        const canvas = await html2canvas(content, {
+            backgroundColor: computedBg,
+            scale: 2, // Higher resolution
+            logging: false,
+            useCORS: true,
+            allowTaint: true,
+            windowHeight: content.scrollHeight,
+            height: content.scrollHeight
+        });
+
+        // Restore original styles
+        content.style.height = originalStyles.height;
+        content.style.maxHeight = originalStyles.maxHeight;
+        content.style.overflow = originalStyles.overflow;
+        content.style.background = originalStyles.background;
+
+        // Convert to blob
+        const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
+
+        // Try to copy to clipboard
+        if (navigator.clipboard && navigator.clipboard.write) {
+            await navigator.clipboard.write([
+                new ClipboardItem({ 'image/png': blob })
+            ]);
+            showShareFeedback('Copied to clipboard!', 'success');
+        } else {
+            // Fallback: download the image
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `prerace-heatmap-${Date.now()}.png`;
+            a.click();
+            URL.revokeObjectURL(url);
+            showShareFeedback('Downloaded image', 'success');
+        }
+    } catch (err) {
+        console.error('Share failed:', err);
+        showShareFeedback('Share failed', 'error');
+    } finally {
+        // Restore button state
+        if (shareBtn) {
+            shareBtn.classList.remove('sharing');
+            shareBtn.setAttribute('title', originalTitle || 'Copy image to clipboard');
+        }
+    }
+}
+
+/**
+ * Show feedback message after share attempt
+ */
+function showShareFeedback(message, type) {
+    // Remove existing feedback
+    const existing = document.querySelector('.share-feedback');
+    if (existing) existing.remove();
+
+    const feedback = document.createElement('div');
+    feedback.className = `share-feedback share-feedback-${type}`;
+    feedback.textContent = message;
+    document.body.appendChild(feedback);
+
+    // Animate in
+    requestAnimationFrame(() => {
+        feedback.classList.add('visible');
+    });
+
+    // Remove after delay
+    setTimeout(() => {
+        feedback.classList.remove('visible');
+        setTimeout(() => feedback.remove(), 300);
+    }, 2000);
+}
+
 export async function preRaceMain() {
     common.initInteractionListeners();
+
+    // Setup share button
+    const shareBtn = document.getElementById('share-btn');
+    if (shareBtn) {
+        shareBtn.addEventListener('click', captureAndShare);
+    }
 
     // Load stored data
     loadStoredAthleteData();
