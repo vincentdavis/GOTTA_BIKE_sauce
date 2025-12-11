@@ -684,9 +684,15 @@ async function setupEventSelector() {
     }
 
     if (subgroupSelect) {
-        subgroupSelect.addEventListener('change', () => {
+        subgroupSelect.addEventListener('change', async () => {
             const subgroupId = subgroupSelect.value;
             if (subgroupId && currentEvent) {
+                // Update route info for selected subgroup
+                const selectedSubgroup = currentEvent.eventSubgroups?.find(
+                    sg => sg.id === parseInt(subgroupId)
+                );
+                await displayRouteInfo(selectedSubgroup);
+
                 loadSubgroupEntrants(parseInt(subgroupId));
             }
         });
@@ -828,7 +834,7 @@ async function loadEvent(eventId) {
         }
 
         currentEvent = event;
-        displayEventInfo(event);
+        await displayEventInfo(event);
     } catch (err) {
         console.error('Failed to load event:', err);
         showError(`Failed to load event: ${err.message}`);
@@ -838,19 +844,143 @@ async function loadEvent(eventId) {
 }
 
 /**
+ * Format countdown to event start
+ */
+function formatCountdown(msUntilStart) {
+    if (msUntilStart <= 0) {
+        return 'Started';
+    }
+
+    const totalSeconds = Math.floor(msUntilStart / 1000);
+    const days = Math.floor(totalSeconds / 86400);
+    const hours = Math.floor((totalSeconds % 86400) / 3600);
+    const minutes = Math.floor((totalSeconds % 3600) / 60);
+
+    const parts = [];
+    if (days > 0) parts.push(`${days}d`);
+    if (hours > 0) parts.push(`${hours}h`);
+    if (minutes > 0 || parts.length === 0) parts.push(`${minutes}m`);
+
+    return `Starts in ${parts.join(' ')}`;
+}
+
+/**
+ * Update countdown display
+ */
+let countdownInterval = null;
+function updateCountdown(eventStart) {
+    const countdownEl = document.getElementById('event-countdown');
+    if (!countdownEl) return;
+
+    const now = Date.now();
+    const msUntilStart = eventStart - now;
+    countdownEl.textContent = formatCountdown(msUntilStart);
+
+    // Add/remove class based on whether event has started
+    if (msUntilStart <= 0) {
+        countdownEl.classList.add('started');
+    } else {
+        countdownEl.classList.remove('started');
+    }
+}
+
+/**
+ * Start countdown timer for event
+ */
+function startCountdownTimer(eventStart) {
+    // Clear any existing interval
+    if (countdownInterval) {
+        clearInterval(countdownInterval);
+    }
+
+    // Update immediately
+    updateCountdown(eventStart);
+
+    // Update every minute
+    countdownInterval = setInterval(() => updateCountdown(eventStart), 60000);
+}
+
+/**
+ * Display route info for a subgroup
+ */
+async function displayRouteInfo(subgroup) {
+    const routeNameEl = document.getElementById('route-name');
+    const routeDistanceEl = document.getElementById('route-distance');
+    const routeElevationEl = document.getElementById('route-elevation');
+
+    if (!subgroup || !subgroup.routeId) {
+        routeNameEl.textContent = '';
+        routeDistanceEl.textContent = '';
+        routeElevationEl.textContent = '';
+        return;
+    }
+
+    try {
+        const route = await common.rpc.getRoute(subgroup.routeId);
+        if (route) {
+            routeNameEl.textContent = route.name || 'Unknown Route';
+        } else {
+            routeNameEl.textContent = '';
+        }
+    } catch (err) {
+        console.warn('Failed to get route:', err);
+        routeNameEl.textContent = '';
+    }
+
+    // Display distance (convert to km)
+    if (subgroup.routeDistance) {
+        const distKm = (subgroup.routeDistance / 1000).toFixed(1);
+        routeDistanceEl.textContent = `${distKm} km`;
+    } else if (subgroup.distanceInMeters && subgroup.laps) {
+        const distKm = ((subgroup.distanceInMeters * subgroup.laps) / 1000).toFixed(1);
+        routeDistanceEl.textContent = `${distKm} km`;
+    } else {
+        routeDistanceEl.textContent = '';
+    }
+
+    // Display elevation
+    if (subgroup.routeClimbing) {
+        routeElevationEl.textContent = `${Math.round(subgroup.routeClimbing)} m`;
+    } else {
+        routeElevationEl.textContent = '';
+    }
+}
+
+/**
  * Display event info
  */
-function displayEventInfo(event) {
+async function displayEventInfo(event) {
     document.getElementById('event-name').textContent = event.name;
+
+    // Display start time
+    const startTimeEl = document.getElementById('event-start-time');
+    const eventStart = event.eventStart || event.ts;
+    if (eventStart) {
+        const startDate = new Date(eventStart);
+        const options = {
+            weekday: 'short',
+            month: 'short',
+            day: 'numeric',
+            hour: 'numeric',
+            minute: '2-digit'
+        };
+        startTimeEl.textContent = startDate.toLocaleString(undefined, options);
+        startCountdownTimer(eventStart);
+    } else {
+        startTimeEl.textContent = '';
+    }
 
     const subgroupSelect = document.getElementById('subgroup-select');
     subgroupSelect.innerHTML = '<option value="">-- Select Category --</option>';
     subgroupSelect.disabled = false;
 
+    let firstSubgroup = null;
     if (event.eventSubgroups && event.eventSubgroups.length > 0) {
         const sortedSubgroups = [...event.eventSubgroups].sort((a, b) => {
             return (a.subgroupLabel || '').localeCompare(b.subgroupLabel || '');
         });
+
+        firstSubgroup = sortedSubgroups[0];
 
         for (const sg of sortedSubgroups) {
             const opt = document.createElement('option');
@@ -863,6 +993,9 @@ function displayEventInfo(event) {
             subgroupSelect.appendChild(opt);
         }
     }
+
+    // Display route info for first subgroup (will update when category selected)
+    await displayRouteInfo(firstSubgroup);
 
     document.getElementById('event-info').hidden = false;
     document.getElementById('entrant-count').textContent = '0';

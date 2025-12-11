@@ -923,3 +923,55 @@ body:not(.transparent-bg) {
     background: #c62828;
     color: #fff;
 }
+
+/* Event Start Info */
+.event-start-info {
+    display: flex;
+    align-items: center;
+    gap: 1em;
+    margin: 0.3em 0;
+    font-size: 0.9em;
+    color: #ccc;
+}
+
+#event-start-time {
+    color: #aaa;
+}
+
+.event-countdown {
+    color: #4fc3f7;
+    font-weight: 500;
+}
+
+.event-countdown.started {
+    color: #81c784;
+}
+
+/* Event Route Info */
+.event-route-info {
+    display: flex;
+    align-items: center;
+    gap: 1em;
+    margin: 0.3em 0;
+    font-size: 0.9em;
+}
+
+.route-name {
+    color: #fff;
+    font-weight: 500;
+}
+
+.route-stats {
+    display: flex;
+    gap: 1em;
+    color: #aaa;
+}
+
+#route-distance::before {
+    content: '';
+}
+
+#route-elevation::before {
+    content: '↑ ';
+    color: #81c784;
+}
