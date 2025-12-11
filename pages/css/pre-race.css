@@ -187,21 +187,114 @@ body.solid-background {
     min-height: 300px;
 }
 
-/* ApexCharts theme overrides for dark mode */
-.apexcharts-tooltip {
-    background: #333 !important;
-    color: #fff !important;
-    border: 1px solid #555 !important;
+/* Heatmap Table Styles */
+.heatmap-table {
+    border-collapse: collapse;
+    width: 100%;
+    table-layout: auto;
 }
 
-.apexcharts-tooltip-title {
-    background: #444 !important;
-    border-bottom: 1px solid #555 !important;
+.heatmap-table th,
+.heatmap-table td {
+    padding: 4px 8px;
+    text-align: center;
+    border: 1px solid #333;
+    white-space: nowrap;
 }
 
-.apexcharts-xaxis-label,
-.apexcharts-yaxis-label {
-    fill: #ccc !important;
+.heatmap-table thead {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+}
+
+.heatmap-table th {
+    background: #1a1a1a;
+    color: #ccc;
+    font-size: 11px;
+    font-weight: normal;
+}
+
+.heatmap-table th.sortable {
+    cursor: pointer;
+    user-select: none;
+}
+
+.heatmap-table th.sortable:hover {
+    color: #fff;
+    font-weight: bold;
+    background: #2a2a2a;
+}
+
+.heatmap-table th.sorted {
+    font-weight: bold;
+    color: #fff;
+}
+
+.heatmap-table .rider-col {
+    text-align: left;
+    min-width: 100px;
+    max-width: 150px;
+}
+
+.heatmap-table .rider-name {
+    text-align: left;
+    max-width: 150px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    background: #1a1a1a;
+    color: #ccc;
+    font-size: 11px;
+}
+
+.heatmap-table .metric-cell {
+    color: #fff;
+    font-size: 10px;
+    font-weight: 400;
+    transition: filter 0.1s;
+}
+
+.heatmap-table .metric-cell:hover {
+    filter: brightness(1.2);
+}
+
+/* Color tiers (8 levels: 0-100 normalized) */
+/* Green = low values, Yellow = median, Red = high values */
+.color-tier-0 { background: #555555; } /* No data / text */
+.color-tier-1 { background: #33BB33; } /* 0-10: Very Low (green) */
+.color-tier-2 { background: #77CC33; } /* 10-25: Low */
+.color-tier-3 { background: #BBDD33; } /* 25-40: Below Median */
+.color-tier-4 { background: #FFDD44; } /* 40-60: Median (yellow) */
+.color-tier-5 { background: #FFAA33; } /* 60-75: Above Median */
+.color-tier-6 { background: #FF6633; } /* 75-90: High */
+.color-tier-7 { background: #FF2222; } /* 90-100: Very High (red) */
+
+/* Heatmap Tooltip */
+.heatmap-tooltip {
+    position: fixed;
+    background: #333;
+    color: #fff;
+    padding: 8px;
+    border-radius: 4px;
+    border: 1px solid #555;
+    z-index: 1000;
+    pointer-events: none;
+    font-size: 12px;
+    max-width: 250px;
+}
+
+.heatmap-tooltip .tooltip-rider {
+    font-weight: bold;
+    margin-bottom: 4px;
+}
+
+.heatmap-tooltip .tooltip-metric {
+    margin-bottom: 4px;
+}
+
+.heatmap-tooltip .tooltip-stats {
+    font-size: 10px;
+    color: #999;
 }
 
 /* Settings Page Styles */

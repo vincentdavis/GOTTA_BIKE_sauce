@@ -36,7 +36,6 @@ let currentEntrants = [];
 let storedAthleteData = {};
 let storedMaxHRData = {};
 let storedMaxPowerData = {};
-let heatmapChart = null;
 let currentSort = { column: 'wkg60', ascending: false };
 
 // All available columns for the heatmap
@@ -931,9 +930,231 @@ function formatColumnValue(value, col) {
 }
 
 /**
- * Render the heatmap chart
+ * Get color tier (0-7) based on normalized value (0-100)
+ * Tier 0 = no data/text, Tier 1-7 = color gradient
+ */
+function getColorTier(normalizedValue) {
+    if (normalizedValue === null || normalizedValue === undefined) return 0;
+    if (normalizedValue < 0) return 0; // Text columns use -0.5
+    if (normalizedValue < 10) return 1;
+    if (normalizedValue < 25) return 2;
+    if (normalizedValue < 40) return 3;
+    if (normalizedValue < 60) return 4;
+    if (normalizedValue < 75) return 5;
+    if (normalizedValue < 90) return 6;
+    return 7;
+}
+
+/**
+ * Normalize a value to 0-100 scale based on column stats (min/median/max)
+ */
+function normalizeValue(value, stats) {
+    if (value === null || value === undefined || value <= 0) return null;
+    if (!stats) return null;
+
+    if (value <= stats.median) {
+        // Scale from min (0) to median (50)
+        if (stats.median > stats.min) {
+            return ((value - stats.min) / (stats.median - stats.min)) * 50;
+        } else {
+            return 50;
+        }
+    } else {
+        // Scale from median (50) to max (100)
+        if (stats.max > stats.median) {
+            return 50 + ((value - stats.median) / (stats.max - stats.median)) * 50;
+        } else {
+            return 100;
+        }
+    }
+}
+
+/**
+ * Build the table header row with sortable columns
+ */
+function buildTableHeader(visibleColumns) {
+    const thead = document.createElement('thead');
+    const tr = document.createElement('tr');
+
+    // Rider name column
+    const riderTh = document.createElement('th');
+    riderTh.className = 'rider-col';
+    riderTh.textContent = 'Rider';
+    tr.appendChild(riderTh);
+
+    // Metric columns
+    for (const col of visibleColumns) {
+        const th = document.createElement('th');
+        th.className = 'metric-col sortable';
+        th.dataset.col = col.id;
+
+        // Build header text with sort indicator
+        let headerText = col.label;
+        if (col.id === currentSort.column) {
+            th.classList.add('sorted');
+            headerText += currentSort.ascending ? ' ▲' : ' ▼';
+        }
+        th.textContent = headerText;
+
+        // Click handler for sorting
+        th.onclick = () => handleColumnClick(col.id);
+
+        tr.appendChild(th);
+    }
+
+    thead.appendChild(tr);
+    return thead;
+}
+
+/**
+ * Build the table body with rider rows and colored cells
+ */
+function buildTableBody(riders, visibleColumns, columnStats) {
+    const tbody = document.createElement('tbody');
+
+    for (const rider of riders) {
+        const tr = document.createElement('tr');
+
+        // Rider name cell
+        const nameTd = document.createElement('td');
+        nameTd.className = 'rider-name';
+        nameTd.textContent = rider.name;
+        nameTd.title = rider.name; // Full name on hover
+        tr.appendChild(nameTd);
+
+        // Metric cells
+        for (const col of visibleColumns) {
+            const td = document.createElement('td');
+            td.className = 'metric-cell';
+
+            let rawValue = rider.athleteData[col.dataKey];
+
+            // For team column, check storedMaxHRData first (user-entered takes priority)
+            if (col.id === 'team') {
+                rawValue = storedMaxHRData[`team_${rider.id}`] || rawValue || '';
+            }
+
+            // Handle text columns differently - no color scaling
+            if (col.format === 'text') {
+                td.classList.add('color-tier-0');
+                td.textContent = rawValue || '';
+                td.dataset.colId = col.id;
+                td.dataset.colLabel = col.label;
+                td.dataset.colFormat = col.format;
+                td.dataset.colSuffix = col.suffix || '';
+                td.dataset.rawValue = rawValue || '';
+                td.dataset.riderName = rider.name;
+                tr.appendChild(td);
+                continue;
+            }
+
+            const value = rawValue !== undefined && rawValue !== null ? Number(rawValue) : null;
+            const stats = columnStats[col.id];
+            const normalizedValue = normalizeValue(value, stats);
+            const colorTier = getColorTier(normalizedValue);
+
+            td.classList.add(`color-tier-${colorTier}`);
+            td.textContent = value !== null && value > 0 ? formatColumnValue(value, col) : '';
+
+            // Store data for tooltip
+            td.dataset.colId = col.id;
+            td.dataset.colLabel = col.label;
+            td.dataset.colFormat = col.format;
+            td.dataset.colSuffix = col.suffix || '';
+            td.dataset.rawValue = value !== null ? value : '';
+            td.dataset.riderName = rider.name;
+
+            tr.appendChild(td);
+        }
+
+        tbody.appendChild(tr);
+    }
+
+    return tbody;
+}
+
+/**
+ * Setup tooltip handlers for heatmap cells
+ */
+function setupCellTooltips(container, visibleColumns, columnStats) {
+    const tooltip = document.getElementById('heatmap-tooltip');
+    if (!tooltip) return;
+
+    const cells = container.querySelectorAll('.metric-cell');
+
+    cells.forEach(cell => {
+        cell.addEventListener('mouseenter', (e) => {
+            const colId = cell.dataset.colId;
+            const colLabel = cell.dataset.colLabel || colId;
+            const colFormat = cell.dataset.colFormat;
+            const colSuffix = cell.dataset.colSuffix;
+            const rawValue = cell.dataset.rawValue;
+            const riderName = cell.dataset.riderName;
+            const stats = columnStats[colId];
+            const col = visibleColumns.find(c => c.id === colId);
+
+            // Build tooltip content
+            const riderDiv = tooltip.querySelector('.tooltip-rider');
+            const metricDiv = tooltip.querySelector('.tooltip-metric');
+            const statsDiv = tooltip.querySelector('.tooltip-stats');
+
+            riderDiv.textContent = riderName;
+
+            // Format value with appropriate suffix
+            let valueStr = 'No data';
+            if (rawValue !== '' && rawValue !== undefined) {
+                // Text columns: display raw value as-is
+                if (colFormat === 'text') {
+                    valueStr = rawValue;
+                } else {
+                    valueStr = formatColumnValue(Number(rawValue), col);
+                    if (colFormat === 'watts') {
+                        valueStr += ' W';
+                    } else if (colFormat === 'wkg') {
+                        valueStr += ' W/kg';
+                    } else if (colFormat === 'percent') {
+                        valueStr += '%';
+                    } else if (colSuffix) {
+                        valueStr += ' ' + colSuffix;
+                    }
+                }
+            }
+            metricDiv.innerHTML = `${colLabel}: <strong>${valueStr}</strong>`;
+
+            // Stats for numeric columns
+            if (stats && col) {
+                const formatStat = v => formatColumnValue(v, col);
+                statsDiv.textContent = `Min: ${formatStat(stats.min)} | Med: ${formatStat(stats.median)} | Max: ${formatStat(stats.max)}`;
+            } else {
+                statsDiv.textContent = '';
+            }
+
+            // Position tooltip
+            tooltip.hidden = false;
+            const rect = cell.getBoundingClientRect();
+            tooltip.style.left = `${rect.right + 10}px`;
+            tooltip.style.top = `${rect.top}px`;
+
+            // Keep tooltip in viewport
+            const tooltipRect = tooltip.getBoundingClientRect();
+            if (tooltipRect.right > window.innerWidth) {
+                tooltip.style.left = `${rect.left - tooltipRect.width - 10}px`;
+            }
+            if (tooltipRect.bottom > window.innerHeight) {
+                tooltip.style.top = `${window.innerHeight - tooltipRect.height - 10}px`;
+            }
+        });
+
+        cell.addEventListener('mouseleave', () => {
+            tooltip.hidden = true;
+        });
+    });
+}
+
+/**
+ * Render the heatmap table
  * Rows = riders, Columns = selected metrics
- * Color scale: min (red) -> median (yellow) -> max (green) per column
+ * Color scale: green (low) -> yellow (median) -> red (high) per column
  */
 function renderHeatmap() {
     const container = document.getElementById('heatmap-chart');
@@ -1002,265 +1223,36 @@ function renderHeatmap() {
         }
     }
 
-    // Build series data for ApexCharts heatmap
-    // Each series is a rider (row), with data points for each column
-    const series = riders.map(rider => {
-        const data = visibleColumns.map(col => {
-            let rawValue = rider.athleteData[col.dataKey];
+    // Build HTML table
+    const table = document.createElement('table');
+    table.className = 'heatmap-table';
 
-            // For team column, check storedMaxHRData first (user-entered takes priority)
-            if (col.id === 'team') {
-                rawValue = storedMaxHRData[`team_${rider.id}`] || rawValue || '';
-            }
+    // Build thead with clickable headers
+    const thead = buildTableHeader(visibleColumns);
+    table.appendChild(thead);
 
-            // Handle text columns differently - no color scaling
-            if (col.format === 'text') {
-                return {
-                    x: col.label,
-                    y: -0.5, // Neutral value for gray color
-                    rawValue: rawValue || '',
-                    colId: col.id,
-                    colFormat: col.format,
-                    colSuffix: col.suffix || ''
-                };
-            }
+    // Build tbody with colored cells
+    const tbody = buildTableBody(riders, visibleColumns, columnStats);
+    table.appendChild(tbody);
 
-            const value = rawValue !== undefined && rawValue !== null ? Number(rawValue) : null;
+    // Replace container contents
+    container.innerHTML = '';
+    container.appendChild(table);
 
-            // Normalize value to 0-100 scale based on column stats
-            // 0 = min (red), 50 = median (yellow), 100 = max (green)
-            let normalizedValue = null;
-            if (value !== null && value > 0) {
-                const stats = columnStats[col.id];
-                if (value <= stats.median) {
-                    // Scale from min (0) to median (50)
-                    if (stats.median > stats.min) {
-                        normalizedValue = ((value - stats.min) / (stats.median - stats.min)) * 50;
-                    } else {
-                        normalizedValue = 50;
-                    }
-                } else {
-                    // Scale from median (50) to max (100)
-                    if (stats.max > stats.median) {
-                        normalizedValue = 50 + ((value - stats.median) / (stats.max - stats.median)) * 50;
-                    } else {
-                        normalizedValue = 100;
-                    }
-                }
-            }
-
-            return {
-                x: col.label,
-                y: normalizedValue,
-                rawValue: value,
-                colId: col.id,
-                colFormat: col.format,
-                colSuffix: col.suffix || ''
-            };
-        });
-        return { name: rider.name, data };
-    });
-
-    const options = {
-        chart: {
-            type: 'heatmap',
-            height: Math.max(400, riders.length * 28 + 80),
-            toolbar: { show: false },
-            background: 'transparent',
-            events: {
-                dataPointSelection: (event, chartContext, config) => {
-                    const colIndex = config.dataPointIndex;
-                    const col = visibleColumns[colIndex];
-                    if (col) {
-                        handleColumnClick(col.id);
-                    }
-                }
-            }
-        },
-        dataLabels: {
-            enabled: true,
-            style: {
-                colors: ['#fff'],
-                fontSize: '10px',
-                fontWeight: 400
-            },
-            formatter: (val, opts) => {
-                // Get the raw value from the data
-                const dataPoint = opts.w.config.series[opts.seriesIndex].data[opts.dataPointIndex];
-                const rawValue = dataPoint?.rawValue;
-                if (rawValue === null || rawValue === undefined || rawValue === '') return '';
-                const col = visibleColumns[opts.dataPointIndex];
-                return formatColumnValue(rawValue, col);
-            }
-        },
-        plotOptions: {
-            heatmap: {
-                shadeIntensity: 0.5,
-                radius: 2,
-                colorScale: {
-                    ranges: [
-                        { from: -1, to: 0, color: '#555555', name: 'No data' },
-                        { from: 0, to: 10, color: '#33BB33', name: 'Very Low' },
-                        { from: 10, to: 25, color: '#77CC33', name: 'Low' },
-                        { from: 25, to: 40, color: '#BBDD33', name: 'Below Median' },
-                        { from: 40, to: 60, color: '#FFDD44', name: 'Median' },
-                        { from: 60, to: 75, color: '#FFAA33', name: 'Above Median' },
-                        { from: 75, to: 90, color: '#FF6633', name: 'High' },
-                        { from: 90, to: 101, color: '#FF2222', name: 'Very High' }
-                    ]
-                }
-            }
-        },
-        series: series,
-        xaxis: {
-            type: 'category',
-            position: 'top',
-            labels: {
-                style: {
-                    colors: '#ccc',
-                    fontSize: '11px'
-                }
-            },
-            axisBorder: { show: false },
-            axisTicks: { show: false }
-        },
-        yaxis: {
-            labels: {
-                style: {
-                    colors: '#ccc',
-                    fontSize: '11px'
-                },
-                maxWidth: 150
-            }
-        },
-        tooltip: {
-            enabled: true,
-            theme: 'dark',
-            custom: function({ series, seriesIndex, dataPointIndex, w }) {
-                const dataPoint = w.config.series[seriesIndex].data[dataPointIndex];
-                const riderName = w.config.series[seriesIndex].name;
-                const colLabel = dataPoint.x;
-                const rawValue = dataPoint.rawValue;
-                const colFormat = dataPoint.colFormat;
-                const colSuffix = dataPoint.colSuffix;
-                const colId = dataPoint.colId;
-                const stats = columnStats[colId];
-                const col = visibleColumns[dataPointIndex];
-
-                let valueStr = 'No data';
-                if (rawValue !== null && rawValue !== undefined) {
-                    valueStr = formatColumnValue(rawValue, col);
-                    // Add appropriate suffix for tooltip
-                    if (colFormat === 'watts') {
-                        valueStr += ' W';
-                    } else if (colFormat === 'wkg') {
-                        valueStr += ' W/kg';
-                    } else if (colFormat === 'percent') {
-                        valueStr += '%';
-                    } else if (colSuffix) {
-                        valueStr += ' ' + colSuffix;
-                    }
-                }
-
-                let statsStr = '';
-                if (stats) {
-                    const formatStat = v => formatColumnValue(v, col);
-                    statsStr = `
-                        <div style="font-size:10px;color:#999;margin-top:4px;">
-                            Min: ${formatStat(stats.min)} | Med: ${formatStat(stats.median)} | Max: ${formatStat(stats.max)}
-                        </div>
-                    `;
-                }
-
-                return `
-                    <div style="padding:8px;">
-                        <div style="font-weight:bold;margin-bottom:4px;">${riderName}</div>
-                        <div>${colLabel}: <strong>${valueStr}</strong></div>
-                        ${statsStr}
-                    </div>
-                `;
-            }
-        },
-        legend: {
-            show: false
-        },
-        grid: {
-            padding: {
-                right: 10,
-                left: 10
-            }
-        },
-        theme: {
-            mode: 'dark'
-        },
-        states: {
-            hover: {
-                filter: {
-                    type: 'lighten',
-                    value: 0.1
-                }
-            }
-        }
-    };
-
-    // Destroy existing chart if any
-    if (heatmapChart) {
-        heatmapChart.destroy();
-    }
-
-    heatmapChart = new ApexCharts(container, options);
-    heatmapChart.render();
-
-    // Add click handlers to x-axis labels for sorting
-    setTimeout(() => {
-        addColumnHeaderClickHandlers(container, visibleColumns);
-    }, 100);
+    // Setup tooltip handlers
+    setupCellTooltips(container, visibleColumns, columnStats);
 }
 
 /**
- * Add click handlers to column headers (x-axis labels) for sorting
+ * Get the value to sort by for a rider and column
+ * Handles special cases like Team column which has multiple data sources
  */
-function addColumnHeaderClickHandlers(container, visibleColumns) {
-    const xaxisLabels = container.querySelectorAll('.apexcharts-xaxis-texts-g text');
-
-    xaxisLabels.forEach((label, index) => {
-        if (index < visibleColumns.length) {
-            const col = visibleColumns[index];
-
-            // Style the label to indicate it's clickable
-            label.style.cursor = 'pointer';
-
-            // Add sort indicator if this is the current sort column
-            if (col.id === currentSort.column) {
-                const arrow = currentSort.ascending ? ' ▲' : ' ▼';
-                // Check if arrow already added
-                if (!label.textContent.includes('▲') && !label.textContent.includes('▼')) {
-                    label.textContent = label.textContent + arrow;
-                }
-            }
-
-            // Add click handler
-            label.onclick = (e) => {
-                e.stopPropagation();
-                handleColumnClick(col.id);
-            };
-
-            // Add hover effect
-            label.onmouseenter = () => {
-                label.style.fill = '#fff';
-                label.style.fontWeight = 'bold';
-            };
-            label.onmouseleave = () => {
-                label.style.fill = '#ccc';
-                label.style.fontWeight = col.id === currentSort.column ? 'bold' : 'normal';
-            };
-
-            // Keep sorted column bold
-            if (col.id === currentSort.column) {
-                label.style.fontWeight = 'bold';
-            }
-        }
-    });
+function getSortValue(rider, col) {
+    // Team column: check storedMaxHRData first (user-entered), then athleteData
+    if (col.id === 'team') {
+        return storedMaxHRData[`team_${rider.id}`] || rider.athleteData[col.dataKey] || '';
+    }
+    return rider.athleteData[col.dataKey];
 }
 
 /**
@@ -1280,13 +1272,33 @@ function sortRiders(riders, visibleColumns) {
     const col = visibleColumns.find(c => c.id === currentSort.column) || visibleColumns[0];
 
     return [...riders].sort((a, b) => {
-        const valA = a.athleteData[col.dataKey] ?? -Infinity;
-        const valB = b.athleteData[col.dataKey] ?? -Infinity;
+        const valA = getSortValue(a, col);
+        const valB = getSortValue(b, col);
+
+        // Text columns: use string comparison
+        if (col.format === 'text') {
+            const strA = (valA || '').toString().toLowerCase();
+            const strB = (valB || '').toString().toLowerCase();
+            // Empty strings sort last
+            if (!strA && strB) return currentSort.ascending ? 1 : -1;
+            if (strA && !strB) return currentSort.ascending ? -1 : 1;
+            if (!strA && !strB) return 0;
+
+            if (currentSort.ascending) {
+                return strA.localeCompare(strB);
+            } else {
+                return strB.localeCompare(strA);
+            }
+        }
+
+        // Numeric columns: use numeric comparison
+        const numA = valA ?? -Infinity;
+        const numB = valB ?? -Infinity;
 
         if (currentSort.ascending) {
-            return valA - valB;
+            return numA - numB;
         } else {
-            return valB - valA;
+            return numB - numA;
         }
     });
 }

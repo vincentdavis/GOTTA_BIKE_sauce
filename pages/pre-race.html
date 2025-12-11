@@ -5,7 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
     <link rel="stylesheet" href="/pages/css/common.css"/>
     <link rel="stylesheet" href="./css/pre-race.css"/>
-    <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
 </head>
 <body class="transparent-bg">
     <div id="titlebar">
@@ -64,6 +63,13 @@
         <div id="no-data" class="no-data" hidden>
             <p>No power data available.</p>
             <p>Click "Import Data" to fetch athlete power profiles from GOTTA.BIKE.</p>
+        </div>
+
+        <!-- Heatmap tooltip (positioned on hover) -->
+        <div id="heatmap-tooltip" class="heatmap-tooltip" hidden>
+            <div class="tooltip-rider"></div>
+            <div class="tooltip-metric"></div>
+            <div class="tooltip-stats"></div>
         </div>
     </div>
 
