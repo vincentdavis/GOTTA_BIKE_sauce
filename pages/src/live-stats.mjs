@@ -13,13 +13,13 @@ const BACKGROUND_OPTIONS = {
     custom: { name: 'Custom', color: null }  // Uses customBackgroundColor
 };
 
-// Available power duration columns
+// Available power duration columns (maps to storedAthleteData fields)
 const POWER_COLUMNS = [
-    { key: 'power5s', seconds: 5, label: '5s' },
-    { key: 'power15s', seconds: 15, label: '15s' },
-    { key: 'power60s', seconds: 60, label: '1m' },
-    { key: 'power300s', seconds: 300, label: '5m' },
-    { key: 'power1200s', seconds: 1200, label: '20m' }
+    { key: 'power_w5', seconds: 5, label: '5s' },
+    { key: 'power_w15', seconds: 15, label: '15s' },
+    { key: 'power_w60', seconds: 60, label: '1m' },
+    { key: 'power_w300', seconds: 300, label: '5m' },
+    { key: 'power_w1200', seconds: 1200, label: '20m' }
 ];
 
 // Available draft columns
@@ -57,12 +57,8 @@ common.settingsStore.setDefault({
     filterMarked: false            // Only show marked/followed riders
 });
 
-// Max HR storage key (global, shared across windows via leading /)
-const MAX_HR_STORAGE_KEY = '/hr-zone-monitor-max-hr-data';
-// Max power storage key (tracks observed max 30s and 1min power per athlete)
-const MAX_POWER_STORAGE_KEY = '/hr-zone-monitor-max-power-data';
-// Comprehensive athlete data storage key (stores all fields from GOTTA.BIKE API)
-const ATHLETE_DATA_KEY = '/hr-zone-monitor-athlete-data';
+// Storage key for consolidated athlete data (global, shared across windows via leading /)
+const ATHLETE_DATA_KEY = '/gotta-bike-sauce-athlete-data';
 
 // Default zone colors
 const DEFAULT_ZONE_COLORS = {
@@ -111,11 +107,9 @@ function loadZoneColors() {
 }
 
 let nearbyData;  // Flat array of nearby athletes
-let storedMaxHRData = {};  // Persisted: { athleteId: maxHR, name_athleteId: "Name" }
-let storedMaxPowerData = {};  // Persisted: { athleteId_5s: maxPower, athleteId_15s: maxPower, ... }
-let storedAthleteData = {};  // Persisted: { athleteId: { ...all GOTTA.BIKE API fields } }
+let storedAthleteData = {};  // Persisted: { athleteId: { ...all athlete data including maxHR, power, etc } }
 let sessionMaxHRData = {};  // Session-only: { athleteId: maxHR }
-let sessionMaxPowerData = {};  // Session-only: { athleteId_5s: maxPower, ... }
+let sessionMaxPowerData = {};  // Session-only: { athleteId_seconds: maxPower, ... }
 let dialogAthleteId = null;
 let dialogAthleteName = null;
 let lastRenderTime = 0;  // Track last render time for refresh interval
@@ -130,22 +124,22 @@ function getEffectiveMaxHR(athleteId) {
     if (mode === 'session') {
         return sessionMaxHRData[athleteId] || 0;
     }
-    return storedMaxHRData[athleteId] || 0;
+    return storedAthleteData[athleteId]?.maxHR || 0;
 }
 
 function getEffectiveMaxPower(athleteId, seconds) {
     const mode = common.settingsStore.get('maxValueMode') || 'stored';
-    const key = `${athleteId}_${seconds}s`;
+    const key = `${athleteId}_${seconds}`;
     if (mode === 'session') {
         return sessionMaxPowerData[key] || 0;
     }
-    return storedMaxPowerData[key] || 0;
+    // Map seconds to the field name in storedAthleteData
+    const fieldName = `power_w${seconds}`;
+    return storedAthleteData[athleteId]?.[fieldName] || 0;
 }
 
 export async function main() {
     common.initInteractionListeners();
-    loadStoredMaxHRData();
-    loadStoredMaxPowerData();
     loadStoredAthleteData();
     loadZoneColors();
 
@@ -189,33 +183,13 @@ export async function main() {
         renderRiders();
     });
 
-    // Listen for max HR data changes from settings window
+    // Listen for athlete data changes from other windows
     common.settingsStore.addEventListener('set', ev => {
-        if (ev.data.key === MAX_HR_STORAGE_KEY) {
-            storedMaxHRData = ev.data.value || {};
-            renderRiders();
-        }
-        if (ev.data.key === MAX_POWER_STORAGE_KEY) {
-            storedMaxPowerData = ev.data.value || {};
+        if (ev.data.key === ATHLETE_DATA_KEY) {
+            storedAthleteData = ev.data.value || {};
             renderRiders();
         }
     });
-}
-
-function loadStoredMaxHRData() {
-    storedMaxHRData = common.settingsStore.get(MAX_HR_STORAGE_KEY) || {};
-}
-
-function saveStoredMaxHRData() {
-    common.settingsStore.set(MAX_HR_STORAGE_KEY, storedMaxHRData);
-}
-
-function loadStoredMaxPowerData() {
-    storedMaxPowerData = common.settingsStore.get(MAX_POWER_STORAGE_KEY) || {};
-}
-
-function saveStoredMaxPowerData() {
-    common.settingsStore.set(MAX_POWER_STORAGE_KEY, storedMaxPowerData);
 }
 
 function loadStoredAthleteData() {
@@ -259,59 +233,46 @@ function extractTeamFromName(name) {
 
 /**
  * Import athlete data from GOTTA.BIKE API response
- * Maps API fields to storage and updates backward-compatible structures
+ * Stores all data in consolidated storedAthleteData structure
+ * Preserves user-edited fields (marked in userEdited object)
  */
 function importGottaAthleteData(riderData) {
     if (!riderData || !riderData.riderId) return null;
 
     const athleteId = riderData.riderId;
 
-    // Get existing data to preserve HR and team (not provided by API)
+    // Get existing data to preserve user edits
     const existingData = storedAthleteData[athleteId] || {};
-    const existingHR = storedMaxHRData[athleteId];
+    const existingUserEdited = existingData.userEdited || {};
 
-    // Determine team: API value, or extract from name, or preserve existing
-    const team = riderData.team || extractTeamFromName(riderData.name) || existingData.team || null;
+    // Determine team: preserve user edit, or API value, or extract from name, or keep existing
+    let team;
+    if (existingUserEdited.team) {
+        team = existingData.team;  // User edited, don't overwrite
+    } else {
+        team = riderData.team || extractTeamFromName(riderData.name) || existingData.team || null;
+    }
 
-    // Store all API fields
+    // Determine name: preserve user edit or use API value
+    let name;
+    if (existingUserEdited.name) {
+        name = existingData.name;  // User edited, don't overwrite
+    } else {
+        name = riderData.name || existingData.name || null;
+    }
+
+    // Store all API fields, preserving user-edited values
     storedAthleteData[athleteId] = {
         ...riderData,
-        // Preserve existing HR if we have it
-        maxHR: existingHR || existingData.maxHR || null,
-        // Use determined team value
+        name: name,
         team: team,
+        // Preserve existing maxHR if user edited
+        maxHR: existingUserEdited.maxHR ? existingData.maxHR : (existingData.maxHR || null),
+        // Preserve userEdited flags
+        userEdited: existingUserEdited,
         // Add import timestamp
         importedAt: Date.now()
     };
-
-    // Update backward-compatible structures
-
-    // Update storedMaxHRData with name/team
-    if (riderData.name) {
-        storedMaxHRData[`name_${athleteId}`] = riderData.name;
-    }
-    if (team && !storedMaxHRData[`team_${athleteId}`]) {
-        storedMaxHRData[`team_${athleteId}`] = team;
-    }
-
-    // Map power fields to storedMaxPowerData
-    // API: power_w5, power_w15, power_w30, power_w60, power_w120, power_w300, power_w1200
-    const powerMapping = {
-        power_w5: '5s',
-        power_w15: '15s',
-        power_w30: '30s',
-        power_w60: '60s',
-        power_w120: '120s',
-        power_w300: '300s',
-        power_w1200: '1200s'
-    };
-
-    for (const [apiField, storageKey] of Object.entries(powerMapping)) {
-        const value = riderData[apiField];
-        if (value && value > 0) {
-            storedMaxPowerData[`${athleteId}_${storageKey}`] = Math.round(value);
-        }
-    }
 
     return storedAthleteData[athleteId];
 }
@@ -384,8 +345,6 @@ async function bulkImportFromGotta(athleteIds, onProgress = null) {
 
         // Save all data
         saveStoredAthleteData();
-        saveStoredMaxPowerData();
-        saveStoredMaxHRData();
 
     } catch (error) {
         throw error;
@@ -401,34 +360,52 @@ function updateMaxPower(athleteId, powerValues, name, team) {
 
     for (const [seconds, power] of Object.entries(powerValues)) {
         if (power > 0) {
-            const key = `${athleteId}_${seconds}s`;
+            const sessionKey = `${athleteId}_${seconds}`;
+            const fieldName = `power_w${seconds}`;
             const roundedPower = Math.round(power);
 
             // Always update session max
-            if (!sessionMaxPowerData[key] || roundedPower > sessionMaxPowerData[key]) {
-                sessionMaxPowerData[key] = roundedPower;
+            if (!sessionMaxPowerData[sessionKey] || roundedPower > sessionMaxPowerData[sessionKey]) {
+                sessionMaxPowerData[sessionKey] = roundedPower;
             }
 
-            // Update stored max if in stored mode
+            // Update stored max if in stored mode (only if greater than current)
             if (mode === 'stored') {
-                if (!storedMaxPowerData[key] || roundedPower > storedMaxPowerData[key]) {
-                    storedMaxPowerData[key] = roundedPower;
+                const currentStored = storedAthleteData[athleteId]?.[fieldName] || 0;
+                if (roundedPower > currentStored) {
                     storedUpdated = true;
                 }
             }
         }
     }
 
-    // Store name/team in HR data structure if we have power data and stored mode
+    // Update storedAthleteData with new power values and name/team
     if (storedUpdated && mode === 'stored') {
-        if (name && !storedMaxHRData[`name_${athleteId}`]) {
-            storedMaxHRData[`name_${athleteId}`] = name;
+        const existingData = storedAthleteData[athleteId] || {};
+        const existingUserEdited = existingData.userEdited || {};
+
+        // Build updated power fields (only update if greater)
+        const updatedPower = {};
+        for (const [seconds, power] of Object.entries(powerValues)) {
+            if (power > 0) {
+                const fieldName = `power_w${seconds}`;
+                const roundedPower = Math.round(power);
+                const currentStored = existingData[fieldName] || 0;
+                if (roundedPower > currentStored) {
+                    updatedPower[fieldName] = roundedPower;
+                }
+            }
         }
-        if (team && !storedMaxHRData[`team_${athleteId}`]) {
-            storedMaxHRData[`team_${athleteId}`] = team;
-            saveStoredMaxHRData();
-        }
-        saveStoredMaxPowerData();
+
+        storedAthleteData[athleteId] = {
+            ...existingData,
+            ...updatedPower,
+            name: existingUserEdited.name ? existingData.name : (name || existingData.name || null),
+            team: existingUserEdited.team ? existingData.team : (team || existingData.team || null),
+            userEdited: existingUserEdited,
+            lastSeenLive: Date.now()
+        };
+        saveStoredAthleteData();
     }
 }
 
@@ -443,17 +420,23 @@ function updateMaxHR(athleteId, hr, name, team) {
         sessionMaxHRData[athleteId] = roundedHR;
     }
 
-    // Update stored max if in stored mode
+    // Update stored max if in stored mode (only if greater than current)
     if (mode === 'stored') {
-        if (!storedMaxHRData[athleteId] || roundedHR > storedMaxHRData[athleteId]) {
-            storedMaxHRData[athleteId] = roundedHR;
-            if (name) {
-                storedMaxHRData[`name_${athleteId}`] = name;
-            }
-            if (team) {
-                storedMaxHRData[`team_${athleteId}`] = team;
-            }
-            saveStoredMaxHRData();
+        const existingData = storedAthleteData[athleteId] || {};
+        const existingUserEdited = existingData.userEdited || {};
+        const currentStoredHR = existingData.maxHR || 0;
+
+        // Only update if new HR is greater and not user-edited
+        if (roundedHR > currentStoredHR && !existingUserEdited.maxHR) {
+            storedAthleteData[athleteId] = {
+                ...existingData,
+                maxHR: roundedHR,
+                name: existingUserEdited.name ? existingData.name : (name || existingData.name || null),
+                team: existingUserEdited.team ? existingData.team : (team || existingData.team || null),
+                userEdited: existingUserEdited,
+                lastSeenLive: Date.now()
+            };
+            saveStoredAthleteData();
         }
     }
 }
@@ -550,11 +533,14 @@ function setupDialog() {
     saveBtn.addEventListener('click', () => {
         const maxHR = parseInt(hrInput.value);
         if (dialogAthleteId && maxHR && maxHR >= 100 && maxHR <= 250) {
-            storedMaxHRData[dialogAthleteId] = maxHR;
-            if (dialogAthleteName) {
-                storedMaxHRData[`name_${dialogAthleteId}`] = dialogAthleteName;
-            }
-            saveStoredMaxHRData();
+            const existingData = storedAthleteData[dialogAthleteId] || {};
+            storedAthleteData[dialogAthleteId] = {
+                ...existingData,
+                maxHR: maxHR,
+                name: dialogAthleteName || existingData.name || null,
+                userEdited: { ...(existingData.userEdited || {}), maxHR: true }
+            };
+            saveStoredAthleteData();
             renderRiders();
         }
         dialog.hidden = true;
@@ -608,8 +594,8 @@ function sortRiders(riders, sortMode) {
             break;
         case 'team':
             sorted.sort((a, b) => {
-                const teamA = storedMaxHRData[`team_${a.athleteId}`] || a.athlete?.team || '';
-                const teamB = storedMaxHRData[`team_${b.athleteId}`] || b.athlete?.team || '';
+                const teamA = storedAthleteData[a.athleteId]?.team || a.athlete?.team || '';
+                const teamB = storedAthleteData[b.athleteId]?.team || b.athlete?.team || '';
                 // First sort by team name
                 const teamCompare = teamA.localeCompare(teamB);
                 if (teamCompare !== 0) return teamCompare;
@@ -662,7 +648,7 @@ function renderRiders() {
         // Make row clickable to set max HR (only useful in stored mode)
         row.style.cursor = 'pointer';
         row.addEventListener('click', () => {
-            showMaxHRDialog(athleteId, name, storedMaxHRData[athleteId]);
+            showMaxHRDialog(athleteId, name, storedAthleteData[athleteId]?.maxHR);
         });
 
         // Name cell
@@ -674,7 +660,7 @@ function renderRiders() {
         // Team cell (if enabled)
         let teamCell = null;
         if (settings.showTeamColumn) {
-            const storedTeam = storedMaxHRData[`team_${athleteId}`];
+            const storedTeam = storedAthleteData[athleteId]?.team;
             const displayTeam = storedTeam || team;
             teamCell = document.createElement('td');
             teamCell.className = 'team-cell';
@@ -1312,7 +1298,7 @@ function renderEntrants(searchFilter = '') {
         filteredEntrants = filteredEntrants.filter(entrant => {
             const athleteId = entrant.id || entrant.athleteId;
             const name = getEntrantName(entrant).toLowerCase();
-            const team = (entrant.team || storedMaxHRData[`team_${athleteId}`] || '').toLowerCase();
+            const team = (entrant.team || storedAthleteData[athleteId]?.team || '').toLowerCase();
             const idStr = String(athleteId);
             return name.includes(filterLower) || team.includes(filterLower) || idStr.includes(filterLower);
         });
@@ -1374,16 +1360,14 @@ function renderEntrants(searchFilter = '') {
     // Render each entrant row
     for (const entrant of filteredEntrants) {
         const athleteId = entrant.id || entrant.athleteId;
-        const athleteData = storedAthleteData[athleteId];
+        const athleteData = storedAthleteData[athleteId] || {};
         const name = getEntrantName(entrant);
-        const storedName = storedMaxHRData[`name_${athleteId}`];
-        const storedTeam = storedMaxHRData[`team_${athleteId}`];
 
         const row = document.createElement('div');
         row.className = 'entrant-row';
 
         // Check if we have GOTTA.BIKE data
-        if (athleteData) {
+        if (athleteData.importedAt) {
             row.classList.add('has-gotta-data');
         }
 
@@ -1417,35 +1401,41 @@ function renderEntrants(searchFilter = '') {
 
                 input.addEventListener('change', (ev) => {
                     const newValue = col.type === 'number' ? parseInt(ev.target.value) : ev.target.value.trim();
+                    const data = storedAthleteData[athleteId] || {};
 
                     if (col.id === 'maxHR') {
                         if (newValue >= 100 && newValue <= 250) {
-                            storedMaxHRData[athleteId] = Math.round(newValue);
-                            if (!storedName && name) storedMaxHRData[`name_${athleteId}`] = name;
-                            saveStoredMaxHRData();
+                            storedAthleteData[athleteId] = {
+                                ...data,
+                                maxHR: Math.round(newValue),
+                                name: data.name || name,
+                                userEdited: { ...(data.userEdited || {}), maxHR: true }
+                            };
+                            saveStoredAthleteData();
                         } else if (ev.target.value === '') {
-                            delete storedMaxHRData[athleteId];
-                            saveStoredMaxHRData();
+                            storedAthleteData[athleteId] = {
+                                ...data,
+                                maxHR: null,
+                                userEdited: { ...(data.userEdited || {}), maxHR: false }
+                            };
+                            saveStoredAthleteData();
                         }
                     } else if (col.id === 'team') {
-                        if (newValue) {
-                            storedMaxHRData[`team_${athleteId}`] = newValue;
-                        } else {
-                            delete storedMaxHRData[`team_${athleteId}`];
-                        }
-                        if (!storedName && name) storedMaxHRData[`name_${athleteId}`] = name;
-                        saveStoredMaxHRData();
+                        storedAthleteData[athleteId] = {
+                            ...data,
+                            team: newValue || null,
+                            name: data.name || name,
+                            userEdited: { ...(data.userEdited || {}), team: !!newValue }
+                        };
+                        saveStoredAthleteData();
                     } else if (col.powerSeconds) {
-                        const powerKey = `${athleteId}_${col.powerSeconds}s`;
-                        if (newValue > 0) {
-                            storedMaxPowerData[powerKey] = Math.round(newValue);
-                            if (!storedName && name) storedMaxHRData[`name_${athleteId}`] = name;
-                            saveStoredMaxPowerData();
-                            saveStoredMaxHRData();
-                        } else if (ev.target.value === '') {
-                            delete storedMaxPowerData[powerKey];
-                            saveStoredMaxPowerData();
-                        }
+                        const fieldName = `power_w${col.powerSeconds}`;
+                        storedAthleteData[athleteId] = {
+                            ...data,
+                            [fieldName]: newValue > 0 ? Math.round(newValue) : null,
+                            name: data.name || name
+                        };
+                        saveStoredAthleteData();
                     }
                 });
 
@@ -1605,7 +1595,6 @@ function renderPowerBubbleChart() {
 
         // Get team name (fallback to 'No Team')
         const team = athleteData.team ||
-                     storedMaxHRData[`team_${athleteId}`] ||
                      entrant.team ||
                      'No Team';
 
@@ -1811,7 +1800,7 @@ const AVAILABLE_COLUMNS = [
     { id: 'team', label: 'Team', type: 'text', getValue: (e, data) => data?.team || e.team || '', editable: true, storageKey: 'team' },
     { id: 'country', label: 'Country', type: 'text', getValue: (e, data) => data?.country || '', editable: false },
     { id: 'gender', label: 'Gender', type: 'text', getValue: (e, data) => data?.gender || '', editable: false },
-    { id: 'maxHR', label: 'Max HR', type: 'number', getValue: (e, data) => storedMaxHRData[e.id || e.athleteId] || '', editable: true, min: 100, max: 250 },
+    { id: 'maxHR', label: 'Max HR', type: 'number', getValue: (e, data) => data?.maxHR || '', editable: true, min: 100, max: 250 },
     { id: 'weight', label: 'Weight', type: 'number', getValue: (e, data) => data?.weight || '', suffix: 'kg', editable: false },
     { id: 'height', label: 'Height', type: 'number', getValue: (e, data) => data?.height || '', suffix: 'cm', editable: false },
 
@@ -1824,13 +1813,13 @@ const AVAILABLE_COLUMNS = [
     { id: 'power_AWC', label: "W'", type: 'number', getValue: (e, data) => data?.power_AWC || '', suffix: 'J', editable: false },
 
     // Power durations (watts)
-    { id: 'power_w5', label: '5s', type: 'number', getValue: (e, data) => data?.power_w5 || storedMaxPowerData[`${e.id || e.athleteId}_5s`] || '', suffix: 'W', editable: true, powerSeconds: 5 },
-    { id: 'power_w15', label: '15s', type: 'number', getValue: (e, data) => data?.power_w15 || storedMaxPowerData[`${e.id || e.athleteId}_15s`] || '', suffix: 'W', editable: true, powerSeconds: 15 },
-    { id: 'power_w30', label: '30s', type: 'number', getValue: (e, data) => data?.power_w30 || storedMaxPowerData[`${e.id || e.athleteId}_30s`] || '', suffix: 'W', editable: true, powerSeconds: 30 },
-    { id: 'power_w60', label: '1m', type: 'number', getValue: (e, data) => data?.power_w60 || storedMaxPowerData[`${e.id || e.athleteId}_60s`] || '', suffix: 'W', editable: true, powerSeconds: 60 },
-    { id: 'power_w120', label: '2m', type: 'number', getValue: (e, data) => data?.power_w120 || storedMaxPowerData[`${e.id || e.athleteId}_120s`] || '', suffix: 'W', editable: true, powerSeconds: 120 },
-    { id: 'power_w300', label: '5m', type: 'number', getValue: (e, data) => data?.power_w300 || storedMaxPowerData[`${e.id || e.athleteId}_300s`] || '', suffix: 'W', editable: true, powerSeconds: 300 },
-    { id: 'power_w1200', label: '20m', type: 'number', getValue: (e, data) => data?.power_w1200 || storedMaxPowerData[`${e.id || e.athleteId}_1200s`] || '', suffix: 'W', editable: true, powerSeconds: 1200 },
+    { id: 'power_w5', label: '5s', type: 'number', getValue: (e, data) => data?.power_w5 || '', suffix: 'W', editable: true, powerSeconds: 5 },
+    { id: 'power_w15', label: '15s', type: 'number', getValue: (e, data) => data?.power_w15 || '', suffix: 'W', editable: true, powerSeconds: 15 },
+    { id: 'power_w30', label: '30s', type: 'number', getValue: (e, data) => data?.power_w30 || '', suffix: 'W', editable: true, powerSeconds: 30 },
+    { id: 'power_w60', label: '1m', type: 'number', getValue: (e, data) => data?.power_w60 || '', suffix: 'W', editable: true, powerSeconds: 60 },
+    { id: 'power_w120', label: '2m', type: 'number', getValue: (e, data) => data?.power_w120 || '', suffix: 'W', editable: true, powerSeconds: 120 },
+    { id: 'power_w300', label: '5m', type: 'number', getValue: (e, data) => data?.power_w300 || '', suffix: 'W', editable: true, powerSeconds: 300 },
+    { id: 'power_w1200', label: '20m', type: 'number', getValue: (e, data) => data?.power_w1200 || '', suffix: 'W', editable: true, powerSeconds: 1200 },
 
     // Power durations (w/kg)
     { id: 'power_wkg5', label: '5s W/kg', type: 'number', getValue: (e, data) => data?.power_wkg5 ? data.power_wkg5.toFixed(2) : '', suffix: '', editable: false },
@@ -1888,7 +1877,7 @@ let eventViewerSort = { column: 'name', ascending: true };
 let visibleEventColumns = [...DEFAULT_VISIBLE_COLUMNS];
 
 // Storage key for GOTTA.BIKE authentication
-const GOTTA_AUTH_KEY = '/hr-zone-monitor-gotta-auth';
+const GOTTA_AUTH_KEY = '/gotta-bike-sauce-auth';
 const GOTTA_API_URL = 'https://app.gotta.bike';
 
 /**
@@ -2416,27 +2405,18 @@ function renderAthleteMaxList(searchFilter = '') {
 
     container.innerHTML = '';
 
-    // Collect all athlete IDs from both HR and power data
-    const hrAthleteIds = Object.keys(storedMaxHRData)
-        .filter(key => !key.startsWith('name_') && !key.startsWith('team_'))
+    // Get all athlete IDs from storedAthleteData
+    let allAthleteIds = Object.keys(storedAthleteData)
         .map(Number)
         .filter(id => !isNaN(id));
-
-    const powerAthleteIds = Object.keys(storedMaxPowerData)
-        .map(key => {
-            const match = key.match(/^(\d+)_\d+s$/);
-            return match ? parseInt(match[1]) : null;
-        })
-        .filter(id => id !== null);
-
-    let allAthleteIds = [...new Set([...hrAthleteIds, ...powerAthleteIds])];
 
     // Apply search filter
     if (searchFilter) {
         const filterLower = searchFilter.toLowerCase();
         allAthleteIds = allAthleteIds.filter(athleteId => {
-            const name = storedMaxHRData[`name_${athleteId}`] || '';
-            const team = storedMaxHRData[`team_${athleteId}`] || '';
+            const data = storedAthleteData[athleteId] || {};
+            const name = data.name || '';
+            const team = data.team || '';
             const idStr = String(athleteId);
             return name.toLowerCase().includes(filterLower) ||
                    team.toLowerCase().includes(filterLower) ||
@@ -2465,30 +2445,16 @@ function renderAthleteMaxList(searchFilter = '') {
         emptyMsg.className = 'no-riders';
         emptyMsg.textContent = searchFilter
             ? 'No athletes match your search.'
-            : 'No athlete data yet. Max values are automatically tracked during rides, or add manually below.';
+            : 'No athlete data yet. Import from GOTTA.BIKE or add manually below.';
         container.appendChild(emptyMsg);
         return;
     }
 
-    // Group power data by athlete
-    const athletePowerData = {};
-    for (const [key, value] of Object.entries(storedMaxPowerData)) {
-        const match = key.match(/^(\d+)_(\d+)s$/);
-        if (match) {
-            const athleteId = parseInt(match[1]);
-            const seconds = parseInt(match[2]);
-            if (!athletePowerData[athleteId]) {
-                athletePowerData[athleteId] = {};
-            }
-            athletePowerData[athleteId][seconds] = value;
-        }
-    }
-
     for (const athleteId of allAthleteIds) {
-        const name = storedMaxHRData[`name_${athleteId}`] || `Athlete ${athleteId}`;
-        const team = storedMaxHRData[`team_${athleteId}`] || '';
-        const maxHR = storedMaxHRData[athleteId] || '';
-        const powers = athletePowerData[athleteId] || {};
+        const athleteData = storedAthleteData[athleteId] || {};
+        const name = athleteData.name || `Athlete ${athleteId}`;
+        const team = athleteData.team || '';
+        const maxHR = athleteData.maxHR || '';
 
         const row = document.createElement('div');
         row.className = 'athlete-max-row';
@@ -2519,12 +2485,13 @@ function renderAthleteMaxList(searchFilter = '') {
         teamInput.title = 'Team name';
         teamInput.addEventListener('change', (ev) => {
             const newTeam = ev.target.value.trim();
-            if (newTeam) {
-                storedMaxHRData[`team_${athleteId}`] = newTeam;
-            } else {
-                delete storedMaxHRData[`team_${athleteId}`];
-            }
-            saveStoredMaxHRData();
+            const data = storedAthleteData[athleteId] || {};
+            storedAthleteData[athleteId] = {
+                ...data,
+                team: newTeam || null,
+                userEdited: { ...(data.userEdited || {}), team: !!newTeam }
+            };
+            saveStoredAthleteData();
             // Update the meta span to reflect the change
             const metaParts = [];
             if (newTeam) metaParts.push(newTeam);
@@ -2543,12 +2510,21 @@ function renderAthleteMaxList(searchFilter = '') {
         hrInput.title = 'Max HR';
         hrInput.addEventListener('change', (ev) => {
             const newMaxHR = parseInt(ev.target.value);
+            const data = storedAthleteData[athleteId] || {};
             if (newMaxHR >= 100 && newMaxHR <= 250) {
-                storedMaxHRData[athleteId] = Math.round(newMaxHR);
-                saveStoredMaxHRData();
+                storedAthleteData[athleteId] = {
+                    ...data,
+                    maxHR: Math.round(newMaxHR),
+                    userEdited: { ...(data.userEdited || {}), maxHR: true }
+                };
+                saveStoredAthleteData();
             } else if (ev.target.value === '') {
-                delete storedMaxHRData[athleteId];
-                saveStoredMaxHRData();
+                storedAthleteData[athleteId] = {
+                    ...data,
+                    maxHR: null,
+                    userEdited: { ...(data.userEdited || {}), maxHR: false }
+                };
+                saveStoredAthleteData();
             }
         });
 
@@ -2557,25 +2533,23 @@ function renderAthleteMaxList(searchFilter = '') {
         powerInputs.className = 'power-inputs';
 
         for (const col of POWER_COLUMNS) {
-            const powerValue = powers[col.seconds] || '';
+            const powerValue = athleteData[col.key] || '';
             const powerInput = document.createElement('input');
             powerInput.type = 'number';
             powerInput.className = 'max-value-input power-input';
-            powerInput.value = powerValue;
+            powerInput.value = powerValue ? Math.round(powerValue) : '';
             powerInput.min = 0;
             powerInput.max = 2500;
             powerInput.placeholder = col.label;
             powerInput.title = `Max ${col.label} power`;
             powerInput.addEventListener('change', (ev) => {
-                const key = `${athleteId}_${col.seconds}s`;
                 const newPower = parseInt(ev.target.value);
-                if (newPower > 0) {
-                    storedMaxPowerData[key] = Math.round(newPower);
-                    saveStoredMaxPowerData();
-                } else {
-                    delete storedMaxPowerData[key];
-                    saveStoredMaxPowerData();
-                }
+                const data = storedAthleteData[athleteId] || {};
+                storedAthleteData[athleteId] = {
+                    ...data,
+                    [col.key]: newPower > 0 ? Math.round(newPower) : null
+                };
+                saveStoredAthleteData();
             });
             powerInputs.appendChild(powerInput);
         }
@@ -2587,22 +2561,8 @@ function renderAthleteMaxList(searchFilter = '') {
         deleteBtn.innerHTML = '<ms>delete</ms>';
         deleteBtn.title = 'Delete all data for this athlete';
         deleteBtn.addEventListener('click', () => {
-            // Delete HR data
-            delete storedMaxHRData[athleteId];
-            delete storedMaxHRData[`name_${athleteId}`];
-            delete storedMaxHRData[`team_${athleteId}`];
-            saveStoredMaxHRData();
-
-            // Delete all power data for this athlete
-            for (const col of POWER_COLUMNS) {
-                delete storedMaxPowerData[`${athleteId}_${col.seconds}s`];
-            }
-            saveStoredMaxPowerData();
-
-            // Delete athlete data
             delete storedAthleteData[athleteId];
             saveStoredAthleteData();
-
             renderAthleteMaxList();
         });
 

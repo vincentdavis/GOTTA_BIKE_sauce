@@ -258,6 +258,32 @@ body.solid-background {
     filter: brightness(1.2);
 }
 
+/* Team edit input */
+.team-edit-input {
+    width: 100%;
+    min-width: 60px;
+    max-width: 100px;
+    background: transparent;
+    border: none;
+    border-bottom: 1px dashed #666;
+    color: #fff;
+    font-size: 10px;
+    text-align: center;
+    padding: 2px 4px;
+    box-sizing: border-box;
+}
+
+.team-edit-input:focus {
+    outline: none;
+    border-bottom: 1px solid #4a9eff;
+    background: rgba(74, 158, 255, 0.1);
+}
+
+.team-edit-input::placeholder {
+    color: #666;
+    font-style: italic;
+}
+
 /* Color tiers (8 levels: 0-100 normalized) */
 /* Green = low values, Yellow = median, Red = high values */
 .color-tier-0 { background: #555555; } /* No data / text */
