@@ -34,6 +34,7 @@ let currentEntrants = [];
 let storedAthleteData = {};
 let currentSort = { column: 'wkg60', ascending: false };
 let teamSort = { column: 'team', ascending: true };
+let zrRoutesData = null; // ZwiftRacing app routes data
 
 // All available columns for the heatmap
 // Categories: info, power_watts, power_wkg, power_model, profile, race_stats, race_ranking, physical
@@ -259,6 +260,9 @@ export async function preRaceMain() {
 
     // Load stored data
     loadStoredAthleteData();
+
+    // Load ZR routes data for world/profile/difficulty info
+    await loadZRRoutesData();
 
     // Apply font scale
     const fontScale = common.settingsStore.get('fontScale') || 1;
@@ -901,30 +905,92 @@ function startCountdownTimer(eventStart) {
 }
 
 /**
+ * Load ZwiftRacing app routes data
+ */
+async function loadZRRoutesData() {
+    if (zrRoutesData) return zrRoutesData;
+
+    try {
+        const response = await fetch('./routes/zr_app.json');
+        if (response.ok) {
+            const data = await response.json();
+            zrRoutesData = data.routes || [];
+            console.log(`[PreRace] Loaded ${zrRoutesData.length} ZR routes`);
+        }
+    } catch (err) {
+        console.warn('Failed to load ZR routes data:', err);
+        zrRoutesData = [];
+    }
+    return zrRoutesData;
+}
+
+/**
+ * Lookup ZR route info by routeId
+ */
+function getZRRouteInfo(routeId) {
+    if (!zrRoutesData || !routeId) return null;
+    const routeIdStr = String(routeId);
+    return zrRoutesData.find(r => r.routeId === routeIdStr);
+}
+
+/**
  * Display route info for a subgroup
  */
 async function displayRouteInfo(subgroup) {
     const routeNameEl = document.getElementById('route-name');
     const routeDistanceEl = document.getElementById('route-distance');
     const routeElevationEl = document.getElementById('route-elevation');
+    const routeWorldEl = document.getElementById('route-world');
+    const routeProfileEl = document.getElementById('route-profile');
+    const routeDifficultyEl = document.getElementById('route-difficulty');
 
     if (!subgroup || !subgroup.routeId) {
         routeNameEl.textContent = '';
         routeDistanceEl.textContent = '';
         routeElevationEl.textContent = '';
+        if (routeWorldEl) routeWorldEl.textContent = '';
+        if (routeProfileEl) routeProfileEl.textContent = '';
+        if (routeDifficultyEl) routeDifficultyEl.textContent = '';
         return;
     }
+
+    // Get ZR route info for world, profile, difficulty
+    const zrRoute = getZRRouteInfo(subgroup.routeId);
 
     try {
         const route = await common.rpc.getRoute(subgroup.routeId);
         if (route) {
-            routeNameEl.textContent = route.name || 'Unknown Route';
+            routeNameEl.textContent = route.name || zrRoute?.name || 'Unknown Route';
         } else {
-            routeNameEl.textContent = '';
+            routeNameEl.textContent = zrRoute?.name || '';
         }
     } catch (err) {
         console.warn('Failed to get route:', err);
-        routeNameEl.textContent = '';
+        routeNameEl.textContent = zrRoute?.name || '';
+    }
+
+    // Display world
+    if (routeWorldEl) {
+        routeWorldEl.textContent = zrRoute?.world || '';
+    }
+
+    // Display profile (Hilly, Flat, etc.)
+    if (routeProfileEl) {
+        routeProfileEl.textContent = zrRoute?.profile || '';
+        // Add class for styling based on profile
+        routeProfileEl.className = 'route-profile';
+        if (zrRoute?.profile) {
+            routeProfileEl.classList.add(`profile-${zrRoute.profile.toLowerCase()}`);
+        }
+    }
+
+    // Display difficulty
+    if (routeDifficultyEl) {
+        if (zrRoute?.difficulty) {
+            routeDifficultyEl.textContent = `🔥 ${zrRoute.difficulty}`;
+        } else {
+            routeDifficultyEl.textContent = '';
+        }
     }
 
     // Display distance (convert to km)
@@ -2979,10 +3045,10 @@ function renderAthleteDetailsPanel(athleteId, data) {
 
     // Profile Handicaps
     const handicapFields = [];
-    if (data.handicaps_profile_flat) handicapFields.push({ key: 'handicaps_profile_flat', label: 'Flat', value: (data.handicaps_profile_flat * 100).toFixed(1) + '%' });
-    if (data.handicaps_profile_rolling) handicapFields.push({ key: 'handicaps_profile_rolling', label: 'Rolling', value: (data.handicaps_profile_rolling * 100).toFixed(1) + '%' });
-    if (data.handicaps_profile_hilly) handicapFields.push({ key: 'handicaps_profile_hilly', label: 'Hilly', value: (data.handicaps_profile_hilly * 100).toFixed(1) + '%' });
-    if (data.handicaps_profile_mountainous) handicapFields.push({ key: 'handicaps_profile_mountainous', label: 'Mountainous', value: (data.handicaps_profile_mountainous * 100).toFixed(1) + '%' });
+    if (data.handicaps_profile_flat) handicapFields.push({ key: 'handicaps_profile_flat', label: 'Flat', value: Math.round(data.handicaps_profile_flat) });
+    if (data.handicaps_profile_rolling) handicapFields.push({ key: 'handicaps_profile_rolling', label: 'Rolling', value: Math.round(data.handicaps_profile_rolling) });
+    if (data.handicaps_profile_hilly) handicapFields.push({ key: 'handicaps_profile_hilly', label: 'Hilly', value: Math.round(data.handicaps_profile_hilly) });
+    if (data.handicaps_profile_mountainous) handicapFields.push({ key: 'handicaps_profile_mountainous', label: 'Mountainous', value: Math.round(data.handicaps_profile_mountainous) });
 
     if (handicapFields.length > 0) {
         let handicapHtml = '<div class="details-section"><div class="details-section-title">Profile Suitability</div><div class="details-grid">';

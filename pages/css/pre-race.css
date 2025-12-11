@@ -975,3 +975,49 @@ body:not(.transparent-bg) {
     content: '↑ ';
     color: #81c784;
 }
+
+.route-world {
+    color: #64b5f6;
+    font-weight: 500;
+}
+
+.route-world::after {
+    content: ' •';
+    color: #666;
+    margin-right: 0.3em;
+}
+
+.route-world:empty::after {
+    content: '';
+}
+
+.route-profile {
+    padding: 0.15em 0.5em;
+    border-radius: 3px;
+    font-size: 0.85em;
+    font-weight: 500;
+}
+
+.route-profile.profile-flat {
+    background: #2e7d32;
+    color: #fff;
+}
+
+.route-profile.profile-rolling {
+    background: #558b2f;
+    color: #fff;
+}
+
+.route-profile.profile-hilly {
+    background: #f57c00;
+    color: #fff;
+}
+
+.route-profile.profile-mountainous {
+    background: #d32f2f;
+    color: #fff;
+}
+
+.route-difficulty {
+    font-size: 0.9em;
+}
