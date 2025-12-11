@@ -40,6 +40,7 @@ let teamSort = { column: 'team', ascending: true };
 const AVAILABLE_COLUMNS = [
     // Info (text columns - no heatmap coloring)
     { id: 'team', label: 'Team', category: 'info', dataKey: 'team', format: 'text' },
+    { id: 'zpCategory', label: 'Category', category: 'info', dataKey: 'zpCategory', format: 'text' },
 
     // Power (Watts)
     { id: 'w5', label: '5s W', category: 'power_watts', dataKey: 'power_w5', format: 'watts' },
@@ -70,7 +71,9 @@ const AVAILABLE_COLUMNS = [
     { id: 'weight', label: 'Weight', category: 'physical', dataKey: 'weight', format: 'decimal1', suffix: 'kg' },
     { id: 'height', label: 'Height', category: 'physical', dataKey: 'height', format: 'decimal1', suffix: 'cm' },
 
-    // Phenotype Scores
+    // Phenotype
+    { id: 'phenoType', label: 'Type', category: 'phenotype', dataKey: 'phenotype_value', format: 'text' },
+    { id: 'phenoBias', label: 'Bias', category: 'phenotype', dataKey: 'phenotype_bias', format: 'decimal2' },
     { id: 'phenoSprinter', label: 'Sprinter', category: 'phenotype', dataKey: 'phenotype_scores_sprinter', format: 'decimal1' },
     { id: 'phenoPuncheur', label: 'Puncheur', category: 'phenotype', dataKey: 'phenotype_scores_puncheur', format: 'decimal1' },
     { id: 'phenoPursuiter', label: 'Pursuiter', category: 'phenotype', dataKey: 'phenotype_scores_pursuiter', format: 'decimal1' },
@@ -93,6 +96,8 @@ const AVAILABLE_COLUMNS = [
     { id: 'raceRating', label: 'Rating', category: 'race_ranking', dataKey: 'race_current_rating', format: 'decimal1' },
     { id: 'raceRating30', label: 'Rating 30d', category: 'race_ranking', dataKey: 'race_max30_rating', format: 'decimal1' },
     { id: 'raceRating90', label: 'Rating 90d', category: 'race_ranking', dataKey: 'race_max90_rating', format: 'decimal1' },
+    { id: 'raceMixedCat', label: 'Mixed Cat', category: 'race_ranking', dataKey: 'race_current_mixed_category', format: 'text' },
+    { id: 'raceMixedRank', label: 'Mixed Rank', category: 'race_ranking', dataKey: 'race_current_mixed_number', format: 'number' },
 ];
 
 // Column categories for grouping in UI

@@ -250,7 +250,7 @@ body.solid-background {
 .heatmap-table .metric-cell {
     color: #fff;
     font-size: 10px;
-    font-weight: 400;
+    font-weight: bold;
     transition: filter 0.1s;
 }
 
