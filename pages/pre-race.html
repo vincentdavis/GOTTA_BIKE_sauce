@@ -60,6 +60,21 @@
             <div id="heatmap-chart"></div>
         </div>
 
+        <div id="radar-chart-container" hidden>
+            <div class="radar-chart-divider"><span>Team Radar Comparison</span></div>
+            <div class="radar-charts-wrapper">
+                <div class="radar-chart-box">
+                    <canvas id="radar-chart-power-wkg"></canvas>
+                </div>
+                <div class="radar-chart-box">
+                    <canvas id="radar-chart-power-watts"></canvas>
+                </div>
+                <div class="radar-chart-box">
+                    <canvas id="radar-chart-phenotype"></canvas>
+                </div>
+            </div>
+        </div>
+
         <div id="no-data" class="no-data" hidden>
             <p>No power data available.</p>
             <p>Click "Import Data" to fetch athlete power profiles from GOTTA.BIKE.</p>
@@ -84,6 +99,7 @@
         </div>
     </div>
 
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
     <script type="module">
         import {preRaceMain} from './src/pre-race.mjs';
         preRaceMain();

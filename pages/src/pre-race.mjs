@@ -1525,6 +1525,9 @@ function renderHeatmap() {
 
             container.appendChild(teamTable);
         }
+
+        // Render radar charts for team comparison
+        renderTeamRadarCharts(teamAggregates);
     }
 
     // Setup tooltip handlers
@@ -1586,6 +1589,17 @@ function sortRiders(riders, visibleColumns) {
     });
 }
 
+// Data keys always needed for radar charts (regardless of heatmap column selection)
+const RADAR_CHART_DATA_KEYS = [
+    // Power W/kg
+    'power_wkg5', 'power_wkg15', 'power_wkg30', 'power_wkg60', 'power_wkg120', 'power_wkg300', 'power_wkg1200',
+    // Power Watts
+    'power_w5', 'power_w15', 'power_w30', 'power_w60', 'power_w120', 'power_w300', 'power_w1200',
+    // Phenotype
+    'phenotype_scores_sprinter', 'phenotype_scores_puncheur', 'phenotype_scores_pursuiter',
+    'phenotype_scores_tt', 'phenotype_scores_climber'
+];
+
 /**
  * Aggregate rider data by team, calculating mean, max, and min values for numeric columns
  * @param {Array} riders - Array of rider objects with athleteData
@@ -1606,6 +1620,18 @@ function aggregateTeamData(riders, visibleColumns) {
         teamGroups[team].push(rider);
     }
 
+    // Build list of all data keys to calculate (visible columns + radar chart keys)
+    const dataKeysToCalculate = new Set();
+    for (const col of visibleColumns) {
+        if (col.format !== 'text') {
+            dataKeysToCalculate.add(col.dataKey);
+        }
+    }
+    // Always include radar chart keys
+    for (const key of RADAR_CHART_DATA_KEYS) {
+        dataKeysToCalculate.add(key);
+    }
+
     // Calculate mean, max, min for each team
     const teamAggregates = [];
 
@@ -1614,22 +1640,20 @@ function aggregateTeamData(riders, visibleColumns) {
         const maxData = {};
         const minData = {};
 
-        for (const col of visibleColumns) {
-            if (col.format === 'text') continue; // Skip text columns
-
+        for (const dataKey of dataKeysToCalculate) {
             const values = teamRiders
-                .map(r => r.athleteData[col.dataKey])
+                .map(r => r.athleteData[dataKey])
                 .filter(v => v !== undefined && v !== null && v > 0);
 
             if (values.length > 0) {
                 const sum = values.reduce((a, b) => a + b, 0);
-                meanData[col.dataKey] = sum / values.length;
-                maxData[col.dataKey] = Math.max(...values);
-                minData[col.dataKey] = Math.min(...values);
+                meanData[dataKey] = sum / values.length;
+                maxData[dataKey] = Math.max(...values);
+                minData[dataKey] = Math.min(...values);
             } else {
-                meanData[col.dataKey] = null;
-                maxData[col.dataKey] = null;
-                minData[col.dataKey] = null;
+                meanData[dataKey] = null;
+                maxData[dataKey] = null;
+                minData[dataKey] = null;
             }
         }
 
@@ -1685,6 +1709,246 @@ function handleTeamColumnClick(columnId) {
         teamSort.ascending = columnId === 'team'; // Ascending for team name, descending for metrics
     }
     renderHeatmap();
+}
+
+// Store chart instances for cleanup
+let radarChartPowerWkg = null;
+let radarChartPowerWatts = null;
+let radarChartPhenotype = null;
+
+/**
+ * Generate a color for each team based on team name
+ */
+function getTeamColor(teamName, alpha = 1) {
+    let hash = 0;
+    for (let i = 0; i < teamName.length; i++) {
+        hash = teamName.charCodeAt(i) + ((hash << 5) - hash);
+    }
+    const h = Math.abs(hash) % 360;
+    return `hsla(${h}, 70%, 50%, ${alpha})`;
+}
+
+/**
+ * Render radar charts for team comparison
+ * @param {Array} teamAggregates - Array of team aggregate objects with mean/max/min data
+ */
+function renderTeamRadarCharts(teamAggregates) {
+    const container = document.getElementById('radar-chart-container');
+    if (!container || !window.Chart) {
+        console.warn('Chart.js not loaded or container not found');
+        return;
+    }
+
+    // Show container if we have teams
+    if (teamAggregates.length === 0) {
+        container.hidden = true;
+        return;
+    }
+    container.hidden = false;
+
+    // Destroy existing charts
+    if (radarChartPowerWkg) {
+        radarChartPowerWkg.destroy();
+        radarChartPowerWkg = null;
+    }
+    if (radarChartPowerWatts) {
+        radarChartPowerWatts.destroy();
+        radarChartPowerWatts = null;
+    }
+    if (radarChartPhenotype) {
+        radarChartPhenotype.destroy();
+        radarChartPhenotype = null;
+    }
+
+    // Sort teams by size (largest first) and limit to top 8 for readability
+    const sortedTeams = [...teamAggregates]
+        .sort((a, b) => b.riderCount - a.riderCount)
+        .slice(0, 8);
+
+    // Power radar chart - W/kg at different durations
+    const powerLabels = ['5s', '15s', '30s', '1m', '2m', '5m', '20m'];
+    const powerWkgKeys = ['power_wkg5', 'power_wkg15', 'power_wkg30', 'power_wkg60', 'power_wkg120', 'power_wkg300', 'power_wkg1200'];
+
+    const powerWkgDatasets = sortedTeams.map(team => ({
+        label: team.team,
+        data: powerWkgKeys.map(key => team.mean[key] || 0),
+        backgroundColor: getTeamColor(team.team, 0.2),
+        borderColor: getTeamColor(team.team, 1),
+        borderWidth: 2,
+        pointBackgroundColor: getTeamColor(team.team, 1),
+        pointBorderColor: '#fff',
+        pointHoverBackgroundColor: '#fff',
+        pointHoverBorderColor: getTeamColor(team.team, 1)
+    }));
+
+    const powerWkgCtx = document.getElementById('radar-chart-power-wkg');
+    if (powerWkgCtx) {
+        radarChartPowerWkg = new Chart(powerWkgCtx, {
+            type: 'radar',
+            data: {
+                labels: powerLabels,
+                datasets: powerWkgDatasets
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: true,
+                plugins: {
+                    title: {
+                        display: true,
+                        text: 'Power Profile (W/kg)',
+                        color: '#fff',
+                        font: { size: 14, weight: 'bold' }
+                    },
+                    legend: {
+                        position: 'bottom',
+                        labels: {
+                            color: '#ccc',
+                            font: { size: 10 },
+                            boxWidth: 12
+                        }
+                    }
+                },
+                scales: {
+                    r: {
+                        angleLines: { color: '#444' },
+                        grid: { color: '#444' },
+                        pointLabels: { color: '#ccc', font: { size: 11 } },
+                        ticks: {
+                            color: '#888',
+                            backdropColor: 'transparent',
+                            font: { size: 9 }
+                        },
+                        suggestedMin: 0
+                    }
+                }
+            }
+        });
+    }
+
+    // Power radar chart - Watts at different durations
+    const powerWattsKeys = ['power_w5', 'power_w15', 'power_w30', 'power_w60', 'power_w120', 'power_w300', 'power_w1200'];
+
+    const powerWattsDatasets = sortedTeams.map(team => ({
+        label: team.team,
+        data: powerWattsKeys.map(key => team.mean[key] || 0),
+        backgroundColor: getTeamColor(team.team, 0.2),
+        borderColor: getTeamColor(team.team, 1),
+        borderWidth: 2,
+        pointBackgroundColor: getTeamColor(team.team, 1),
+        pointBorderColor: '#fff',
+        pointHoverBackgroundColor: '#fff',
+        pointHoverBorderColor: getTeamColor(team.team, 1)
+    }));
+
+    const powerWattsCtx = document.getElementById('radar-chart-power-watts');
+    if (powerWattsCtx) {
+        radarChartPowerWatts = new Chart(powerWattsCtx, {
+            type: 'radar',
+            data: {
+                labels: powerLabels,
+                datasets: powerWattsDatasets
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: true,
+                plugins: {
+                    title: {
+                        display: true,
+                        text: 'Power Profile (Watts)',
+                        color: '#fff',
+                        font: { size: 14, weight: 'bold' }
+                    },
+                    legend: {
+                        position: 'bottom',
+                        labels: {
+                            color: '#ccc',
+                            font: { size: 10 },
+                            boxWidth: 12
+                        }
+                    }
+                },
+                scales: {
+                    r: {
+                        angleLines: { color: '#444' },
+                        grid: { color: '#444' },
+                        pointLabels: { color: '#ccc', font: { size: 11 } },
+                        ticks: {
+                            color: '#888',
+                            backdropColor: 'transparent',
+                            font: { size: 9 }
+                        },
+                        suggestedMin: 0
+                    }
+                }
+            }
+        });
+    }
+
+    // Phenotype radar chart
+    const phenoLabels = ['Sprinter', 'Puncheur', 'Pursuiter', 'TT', 'Climber'];
+    const phenoKeys = [
+        'phenotype_scores_sprinter',
+        'phenotype_scores_puncheur',
+        'phenotype_scores_pursuiter',
+        'phenotype_scores_tt',
+        'phenotype_scores_climber'
+    ];
+
+    const phenoDatasets = sortedTeams.map(team => ({
+        label: team.team,
+        data: phenoKeys.map(key => team.mean[key] || 0),
+        backgroundColor: getTeamColor(team.team, 0.2),
+        borderColor: getTeamColor(team.team, 1),
+        borderWidth: 2,
+        pointBackgroundColor: getTeamColor(team.team, 1),
+        pointBorderColor: '#fff',
+        pointHoverBackgroundColor: '#fff',
+        pointHoverBorderColor: getTeamColor(team.team, 1)
+    }));
+
+    const phenoCtx = document.getElementById('radar-chart-phenotype');
+    if (phenoCtx) {
+        radarChartPhenotype = new Chart(phenoCtx, {
+            type: 'radar',
+            data: {
+                labels: phenoLabels,
+                datasets: phenoDatasets
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: true,
+                plugins: {
+                    title: {
+                        display: true,
+                        text: 'Phenotype Profile',
+                        color: '#fff',
+                        font: { size: 14, weight: 'bold' }
+                    },
+                    legend: {
+                        position: 'bottom',
+                        labels: {
+                            color: '#ccc',
+                            font: { size: 10 },
+                            boxWidth: 12
+                        }
+                    }
+                },
+                scales: {
+                    r: {
+                        angleLines: { color: '#444' },
+                        grid: { color: '#444' },
+                        pointLabels: { color: '#ccc', font: { size: 11 } },
+                        ticks: {
+                            color: '#888',
+                            backdropColor: 'transparent',
+                            font: { size: 9 }
+                        },
+                        suggestedMin: 0
+                    }
+                }
+            }
+        });
+    }
 }
 
 /**
