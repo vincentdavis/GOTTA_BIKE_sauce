@@ -234,6 +234,30 @@ function getStoredAthleteData(athleteId) {
 }
 
 /**
+ * Extract team name from rider name (similar to Sauce4Zwift)
+ * Looks for team in square brackets [TEAM] or parentheses (TEAM)
+ * @param {string} name - Rider name that may contain team
+ * @returns {string|null} - Extracted team name or null
+ */
+function extractTeamFromName(name) {
+    if (!name) return null;
+
+    // Try square brackets first: [TEAM]
+    const bracketMatch = name.match(/\[([^\]]+)\]/);
+    if (bracketMatch) {
+        return bracketMatch[1].trim();
+    }
+
+    // Try parentheses: (TEAM)
+    const parenMatch = name.match(/\(([^)]+)\)/);
+    if (parenMatch) {
+        return parenMatch[1].trim();
+    }
+
+    return null;
+}
+
+/**
  * Import athlete data from GOTTA.BIKE API response
  * Maps API fields to storage and updates backward-compatible structures
  */
@@ -242,15 +266,20 @@ function importGottaAthleteData(riderData) {
 
     const athleteId = riderData.riderId;
 
-    // Get existing data to preserve HR (not provided by API)
+    // Get existing data to preserve HR and team (not provided by API)
     const existingData = storedAthleteData[athleteId] || {};
     const existingHR = storedMaxHRData[athleteId];
+
+    // Determine team: API value, or extract from name, or preserve existing
+    const team = riderData.team || extractTeamFromName(riderData.name) || existingData.team || null;
 
     // Store all API fields
     storedAthleteData[athleteId] = {
         ...riderData,
         // Preserve existing HR if we have it
         maxHR: existingHR || existingData.maxHR || null,
+        // Use determined team value
+        team: team,
         // Add import timestamp
         importedAt: Date.now()
     };
@@ -261,7 +290,9 @@ function importGottaAthleteData(riderData) {
     if (riderData.name) {
         storedMaxHRData[`name_${athleteId}`] = riderData.name;
     }
-    // Note: API doesn't provide team, but we could store zpCategory or other fields
+    if (team && !storedMaxHRData[`team_${athleteId}`]) {
+        storedMaxHRData[`team_${athleteId}`] = team;
+    }
 
     // Map power fields to storedMaxPowerData
     // API: power_w5, power_w15, power_w30, power_w60, power_w120, power_w300, power_w1200

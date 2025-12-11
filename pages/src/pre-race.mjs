@@ -860,28 +860,58 @@ async function bulkImportFromGotta(athleteIds, progressCallback) {
     console.log('[PreRace] All batches complete, saving data');
     saveStoredAthleteData();
     saveStoredMaxHRData();  // Save name/team data for Known Athletes list
+    saveStoredMaxPowerData();  // Save power data for Known Athletes list
     console.log('[PreRace] Data saved, returning results');
     return results;
 }
 
 /**
+ * Extract team name from rider name (similar to Sauce4Zwift)
+ * Looks for team in square brackets [TEAM] or parentheses (TEAM)
+ * @param {string} name - Rider name that may contain team
+ * @returns {string|null} - Extracted team name or null
+ */
+function extractTeamFromName(name) {
+    if (!name) return null;
+
+    // Try square brackets first: [TEAM]
+    const bracketMatch = name.match(/\[([^\]]+)\]/);
+    if (bracketMatch) {
+        return bracketMatch[1].trim();
+    }
+
+    // Try parentheses: (TEAM)
+    const parenMatch = name.match(/\(([^)]+)\)/);
+    if (parenMatch) {
+        return parenMatch[1].trim();
+    }
+
+    return null;
+}
+
+/**
  * Import single athlete data from API response
  * Uses spread operator to preserve ALL fields from API (matches live-stats.mjs)
- * Also updates storedMaxHRData so athlete appears in Known Athletes list
+ * Also updates storedMaxHRData and storedMaxPowerData so athlete appears in Known Athletes list
  */
 function importAthleteData(riderData) {
     if (!riderData || !riderData.riderId) return;
 
     const athleteId = riderData.riderId;
 
-    // Get existing data to preserve any local additions (like HR data)
+    // Get existing data to preserve any local additions (like HR data, team)
     const existingData = storedAthleteData[athleteId] || {};
+
+    // Determine team: API value, or extract from name, or preserve existing
+    const team = riderData.team || extractTeamFromName(riderData.name) || existingData.team || null;
 
     // Store ALL API fields using spread, preserving existing local data
     storedAthleteData[athleteId] = {
         ...riderData,
         // Preserve existing maxHR if we have it (not provided by API)
         maxHR: existingData.maxHR || null,
+        // Use determined team value
+        team: team,
         // Add import timestamp
         importedAt: Date.now()
     };
@@ -891,8 +921,27 @@ function importAthleteData(riderData) {
     if (riderData.name && !storedMaxHRData[`name_${athleteId}`]) {
         storedMaxHRData[`name_${athleteId}`] = riderData.name;
     }
-    if (riderData.team && !storedMaxHRData[`team_${athleteId}`]) {
-        storedMaxHRData[`team_${athleteId}`] = riderData.team;
+    if (team && !storedMaxHRData[`team_${athleteId}`]) {
+        storedMaxHRData[`team_${athleteId}`] = team;
+    }
+
+    // Map power fields to storedMaxPowerData (matches live-stats.mjs)
+    // This ensures power values show in the Known Athletes list
+    const powerMapping = {
+        power_w5: '5s',
+        power_w15: '15s',
+        power_w30: '30s',
+        power_w60: '60s',
+        power_w120: '120s',
+        power_w300: '300s',
+        power_w1200: '1200s'
+    };
+
+    for (const [apiField, storageKey] of Object.entries(powerMapping)) {
+        const value = riderData[apiField];
+        if (value && value > 0) {
+            storedMaxPowerData[`${athleteId}_${storageKey}`] = Math.round(value);
+        }
     }
 }
 
