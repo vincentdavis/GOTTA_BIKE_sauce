@@ -1870,7 +1870,7 @@ function renderAthleteMaxList(searchFilter = '') {
 
     container.innerHTML = '';
 
-    // Collect all athlete IDs from both HR and power data
+    // Collect all athlete IDs from HR data, power data, AND imported athlete data
     const hrAthleteIds = Object.keys(storedMaxHRData)
         .filter(key => !key.startsWith('name_') && !key.startsWith('team_'))
         .map(Number)
@@ -1883,14 +1883,20 @@ function renderAthleteMaxList(searchFilter = '') {
         })
         .filter(id => id !== null);
 
-    let allAthleteIds = [...new Set([...hrAthleteIds, ...powerAthleteIds])];
+    // Also include athletes from storedAthleteData (imported from GOTTA.BIKE)
+    const importedAthleteIds = Object.keys(storedAthleteData)
+        .map(Number)
+        .filter(id => !isNaN(id));
+
+    let allAthleteIds = [...new Set([...hrAthleteIds, ...powerAthleteIds, ...importedAthleteIds])];
 
     // Apply search filter
     if (searchFilter) {
         const filterLower = searchFilter.toLowerCase();
         allAthleteIds = allAthleteIds.filter(athleteId => {
-            const name = storedMaxHRData[`name_${athleteId}`] || '';
-            const team = storedMaxHRData[`team_${athleteId}`] || '';
+            // Check multiple sources for name and team
+            const name = storedMaxHRData[`name_${athleteId}`] || storedAthleteData[athleteId]?.name || '';
+            const team = storedMaxHRData[`team_${athleteId}`] || storedAthleteData[athleteId]?.team || '';
             const idStr = String(athleteId);
             return name.toLowerCase().includes(filterLower) ||
                    team.toLowerCase().includes(filterLower) ||
@@ -1938,8 +1944,9 @@ function renderAthleteMaxList(searchFilter = '') {
     }
 
     for (const athleteId of allAthleteIds) {
-        const name = storedMaxHRData[`name_${athleteId}`] || `Athlete ${athleteId}`;
-        const team = storedMaxHRData[`team_${athleteId}`] || '';
+        // Check multiple sources for name and team (user-edited takes priority)
+        const name = storedMaxHRData[`name_${athleteId}`] || storedAthleteData[athleteId]?.name || `Athlete ${athleteId}`;
+        const team = storedMaxHRData[`team_${athleteId}`] || storedAthleteData[athleteId]?.team || '';
         const maxHR = storedMaxHRData[athleteId] || '';
         const powers = athletePowerData[athleteId] || {};
 
@@ -1951,8 +1958,10 @@ function renderAthleteMaxList(searchFilter = '') {
         infoDiv.className = 'athlete-info';
 
         const nameSpan = document.createElement('span');
-        nameSpan.className = 'athlete-name';
+        nameSpan.className = 'athlete-name clickable-name';
         nameSpan.textContent = name;
+        nameSpan.title = 'Click to view all data';
+        nameSpan.onclick = () => showRiderModal(athleteId, name);
         infoDiv.appendChild(nameSpan);
 
         const metaSpan = document.createElement('span');

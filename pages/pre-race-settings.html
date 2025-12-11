@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html data-settings-key="pre-race-settings-v1">
+<html class="settings-page" data-settings-key="pre-race-settings-v1">
 <head>
     <meta charset="utf-8"/>
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
@@ -191,6 +191,17 @@
             </div>
         </div>
     </div><!-- end #zwift-tab -->
+
+    <!-- Rider details modal -->
+    <div id="rider-modal" class="rider-modal-overlay" hidden>
+        <div class="rider-modal">
+            <div class="rider-modal-header">
+                <span class="rider-modal-title"></span>
+                <button class="rider-modal-close" title="Close">&times;</button>
+            </div>
+            <div class="rider-modal-body"></div>
+        </div>
+    </div>
 
     <script type="module">
         import {preRaceSettingsMain} from './src/pre-race.mjs';

@@ -391,6 +391,17 @@ body.solid-background {
     text-decoration: underline;
 }
 
+/* Clickable athlete name in Known Athletes list */
+.clickable-name {
+    cursor: pointer;
+    color: #6af;
+}
+
+.clickable-name:hover {
+    color: #8cf;
+    text-decoration: underline;
+}
+
 /* Athlete Details Panel (used in modal and Known Athletes) */
 .athlete-details-content {
     display: flex;
