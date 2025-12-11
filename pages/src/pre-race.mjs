@@ -33,6 +33,7 @@ let currentEvent = null;
 let currentEntrants = [];
 let storedAthleteData = {};
 let currentSort = { column: 'wkg60', ascending: false };
+let teamSort = { column: 'team', ascending: true };
 
 // All available columns for the heatmap
 // Categories: info, power_watts, power_wkg, power_model, profile, race_stats, race_ranking, physical
@@ -1137,6 +1138,116 @@ function buildTableBody(riders, visibleColumns, columnStats) {
 }
 
 /**
+ * Build the table header row for team heatmap with sortable columns
+ */
+function buildTeamTableHeader(visibleColumns) {
+    const thead = document.createElement('thead');
+    const tr = document.createElement('tr');
+
+    // Team name column (sortable)
+    const teamTh = document.createElement('th');
+    teamTh.className = 'team-col sortable';
+    teamTh.dataset.col = 'team';
+    let teamHeaderText = 'Team';
+    if (teamSort.column === 'team') {
+        teamTh.classList.add('sorted');
+        teamHeaderText += teamSort.ascending ? ' ▲' : ' ▼';
+    }
+    teamTh.textContent = teamHeaderText;
+    teamTh.onclick = () => handleTeamColumnClick('team');
+    tr.appendChild(teamTh);
+
+    // Rider count column
+    const countTh = document.createElement('th');
+    countTh.className = 'metric-col';
+    countTh.textContent = '#';
+    countTh.title = 'Number of riders';
+    tr.appendChild(countTh);
+
+    // Metric columns (same as athlete heatmap, skip text columns)
+    for (const col of visibleColumns) {
+        if (col.format === 'text') continue;
+
+        const th = document.createElement('th');
+        th.className = 'metric-col sortable';
+        th.dataset.col = col.id;
+
+        let headerText = col.label;
+        if (col.id === teamSort.column) {
+            th.classList.add('sorted');
+            headerText += teamSort.ascending ? ' ▲' : ' ▼';
+        }
+        th.textContent = headerText;
+        th.onclick = () => handleTeamColumnClick(col.id);
+
+        tr.appendChild(th);
+    }
+
+    thead.appendChild(tr);
+    return thead;
+}
+
+/**
+ * Build the table body for team heatmap with colored cells
+ * Uses the SAME columnStats from athlete heatmap for consistent coloring
+ * @param {Array} teams - Array of team aggregate objects
+ * @param {Array} visibleColumns - Array of column definitions
+ * @param {Object} columnStats - Column statistics for color scaling
+ * @param {string} statType - Which stat to display: 'mean', 'max', or 'min'
+ * @param {string} statLabel - Label for tooltip: 'Mean', 'Max', or 'Min'
+ */
+function buildTeamTableBody(teams, visibleColumns, columnStats, statType = 'mean', statLabel = 'Mean') {
+    const tbody = document.createElement('tbody');
+
+    for (const team of teams) {
+        const tr = document.createElement('tr');
+
+        // Team name cell
+        const nameTd = document.createElement('td');
+        nameTd.className = 'team-name-cell';
+        nameTd.textContent = team.team;
+        nameTd.title = `${team.riderCount} rider(s)`;
+        tr.appendChild(nameTd);
+
+        // Rider count cell
+        const countTd = document.createElement('td');
+        countTd.className = 'metric-cell color-tier-0';
+        countTd.textContent = team.riderCount;
+        tr.appendChild(countTd);
+
+        // Metric cells (same coloring logic as athlete heatmap)
+        for (const col of visibleColumns) {
+            if (col.format === 'text') continue;
+
+            const td = document.createElement('td');
+            td.className = 'metric-cell';
+
+            const value = team[statType]?.[col.dataKey];
+            const stats = columnStats[col.id];
+            const normalizedValue = normalizeValue(value, stats);
+            const colorTier = getColorTier(normalizedValue);
+
+            td.classList.add(`color-tier-${colorTier}`);
+            td.textContent = value !== null && value > 0 ? formatColumnValue(value, col) : '';
+
+            // Store data for tooltip
+            td.dataset.colId = col.id;
+            td.dataset.colLabel = col.label;
+            td.dataset.colFormat = col.format;
+            td.dataset.colSuffix = col.suffix || '';
+            td.dataset.rawValue = value !== null ? value : '';
+            td.dataset.riderName = `${team.team} (${statLabel})`;
+
+            tr.appendChild(td);
+        }
+
+        tbody.appendChild(tr);
+    }
+
+    return tbody;
+}
+
+/**
  * Setup tooltip handlers for heatmap cells
  */
 function setupCellTooltips(container, visibleColumns, columnStats) {
@@ -1374,6 +1485,43 @@ function renderHeatmap() {
     container.innerHTML = '';
     container.appendChild(table);
 
+    // Build Team Heatmaps (Mean, Max, Min)
+    const teamAggregates = aggregateTeamData(riders, visibleColumns);
+
+    if (teamAggregates.length > 0) {
+        // Define the team stats to render
+        const teamStats = [
+            { type: 'mean', label: 'Mean', title: 'Team Averages' },
+            { type: 'max', label: 'Max', title: 'Team Maximums' },
+            { type: 'min', label: 'Min', title: 'Team Minimums' }
+        ];
+
+        for (const stat of teamStats) {
+            // Section divider
+            const divider = document.createElement('div');
+            divider.className = 'team-heatmap-divider';
+            divider.innerHTML = `<span>${stat.title}</span>`;
+            container.appendChild(divider);
+
+            // Sort teams by this stat type
+            const sortedTeams = sortTeams(teamAggregates, visibleColumns, stat.type);
+
+            // Build team table
+            const teamTable = document.createElement('table');
+            teamTable.className = 'heatmap-table team-heatmap-table';
+
+            // Build team thead
+            const teamThead = buildTeamTableHeader(visibleColumns);
+            teamTable.appendChild(teamThead);
+
+            // Build team tbody - use SAME columnStats for consistent coloring
+            const teamTbody = buildTeamTableBody(sortedTeams, visibleColumns, columnStats, stat.type, stat.label);
+            teamTable.appendChild(teamTbody);
+
+            container.appendChild(teamTable);
+        }
+    }
+
     // Setup tooltip handlers
     setupCellTooltips(container, visibleColumns, columnStats);
 }
@@ -1431,6 +1579,107 @@ function sortRiders(riders, visibleColumns) {
             return numB - numA;
         }
     });
+}
+
+/**
+ * Aggregate rider data by team, calculating mean, max, and min values for numeric columns
+ * @param {Array} riders - Array of rider objects with athleteData
+ * @param {Array} visibleColumns - Array of column definitions
+ * @returns {Array} Array of team aggregate objects with mean, max, min stats
+ */
+function aggregateTeamData(riders, visibleColumns) {
+    // Group riders by team
+    const teamGroups = {};
+
+    for (const rider of riders) {
+        const team = rider.athleteData?.team || null;
+        if (!team) continue; // Skip riders without a team
+
+        if (!teamGroups[team]) {
+            teamGroups[team] = [];
+        }
+        teamGroups[team].push(rider);
+    }
+
+    // Calculate mean, max, min for each team
+    const teamAggregates = [];
+
+    for (const [teamName, teamRiders] of Object.entries(teamGroups)) {
+        const meanData = {};
+        const maxData = {};
+        const minData = {};
+
+        for (const col of visibleColumns) {
+            if (col.format === 'text') continue; // Skip text columns
+
+            const values = teamRiders
+                .map(r => r.athleteData[col.dataKey])
+                .filter(v => v !== undefined && v !== null && v > 0);
+
+            if (values.length > 0) {
+                const sum = values.reduce((a, b) => a + b, 0);
+                meanData[col.dataKey] = sum / values.length;
+                maxData[col.dataKey] = Math.max(...values);
+                minData[col.dataKey] = Math.min(...values);
+            } else {
+                meanData[col.dataKey] = null;
+                maxData[col.dataKey] = null;
+                minData[col.dataKey] = null;
+            }
+        }
+
+        teamAggregates.push({
+            team: teamName,
+            riderCount: teamRiders.length,
+            mean: meanData,
+            max: maxData,
+            min: minData
+        });
+    }
+
+    return teamAggregates;
+}
+
+/**
+ * Sort teams by current team sort column
+ * @param {Array} teams - Array of team aggregate objects
+ * @param {Array} visibleColumns - Array of column definitions
+ * @param {string} statType - Which stat to sort by: 'mean', 'max', or 'min'
+ */
+function sortTeams(teams, visibleColumns, statType = 'mean') {
+    if (teamSort.column === 'team') {
+        return [...teams].sort((a, b) => {
+            const cmp = a.team.toLowerCase().localeCompare(b.team.toLowerCase());
+            return teamSort.ascending ? cmp : -cmp;
+        });
+    }
+
+    const col = visibleColumns.find(c => c.id === teamSort.column);
+    if (!col) return teams;
+
+    return [...teams].sort((a, b) => {
+        const valA = a[statType]?.[col.dataKey] ?? -Infinity;
+        const valB = b[statType]?.[col.dataKey] ?? -Infinity;
+
+        if (teamSort.ascending) {
+            return valA - valB;
+        } else {
+            return valB - valA;
+        }
+    });
+}
+
+/**
+ * Handle team column header click for sorting
+ */
+function handleTeamColumnClick(columnId) {
+    if (teamSort.column === columnId) {
+        teamSort.ascending = !teamSort.ascending;
+    } else {
+        teamSort.column = columnId;
+        teamSort.ascending = columnId === 'team'; // Ascending for team name, descending for metrics
+    }
+    renderHeatmap();
 }
 
 /**

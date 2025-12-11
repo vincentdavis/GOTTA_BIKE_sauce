@@ -790,3 +790,41 @@ body:not(.transparent-bg) {
 .column-picker-actions button:hover {
     background: #555;
 }
+
+/* Team Heatmap Styles */
+.team-heatmap-divider {
+    margin: 1.5em 0 0.5em 0;
+    padding: 0.5em 0;
+    border-top: 1px solid #444;
+    text-align: left;
+    font-size: 0.9em;
+    color: #aaa;
+}
+
+.team-heatmap-divider span {
+    background: var(--background-color, #000);
+    padding: 0 0.5em;
+    color: #fff;
+    font-weight: 500;
+}
+
+.team-heatmap-table {
+    margin-top: 0.5em;
+}
+
+.team-heatmap-table .team-col {
+    text-align: left;
+    min-width: 80px;
+    max-width: 120px;
+}
+
+.team-heatmap-table .team-name-cell {
+    text-align: left;
+    max-width: 120px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    background: #1a1a1a;
+    color: #ccc;
+    font-size: 11px;
+    font-weight: 500;
+}
