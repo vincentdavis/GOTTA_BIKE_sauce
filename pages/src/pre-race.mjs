@@ -972,6 +972,7 @@ async function displayRouteInfo(subgroup) {
     const routeWorldEl = document.getElementById('route-world');
     const routeProfileEl = document.getElementById('route-profile');
     const routeDifficultyEl = document.getElementById('route-difficulty');
+    const routeInfoLinkEl = document.getElementById('route-info-link');
 
     if (!subgroup || !subgroup.routeId) {
         routeNameEl.textContent = '';
@@ -980,6 +981,7 @@ async function displayRouteInfo(subgroup) {
         if (routeWorldEl) routeWorldEl.textContent = '';
         if (routeProfileEl) routeProfileEl.textContent = '';
         if (routeDifficultyEl) routeDifficultyEl.textContent = '';
+        if (routeInfoLinkEl) routeInfoLinkEl.hidden = true;
         currentRouteProfile = null;
         return;
     }
@@ -1042,6 +1044,19 @@ async function displayRouteInfo(subgroup) {
         routeElevationEl.textContent = `${Math.round(subgroup.routeClimbing)} m`;
     } else {
         routeElevationEl.textContent = '';
+    }
+
+    // Display route info link
+    if (routeInfoLinkEl) {
+        if (zrRoute?.url) {
+            routeInfoLinkEl.hidden = false;
+            routeInfoLinkEl.onclick = (e) => {
+                e.preventDefault();
+                common.rpc.openExternalLink(zrRoute.url);
+            };
+        } else {
+            routeInfoLinkEl.hidden = true;
+        }
     }
 }
 

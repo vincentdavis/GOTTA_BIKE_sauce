@@ -1021,3 +1021,21 @@ body:not(.transparent-bg) {
 .route-difficulty {
     font-size: 0.9em;
 }
+
+.route-info-link {
+    color: #64b5f6;
+    text-decoration: none;
+    font-size: 0.85em;
+    padding: 0.15em 0.5em;
+    border: 1px solid #64b5f6;
+    border-radius: 3px;
+    cursor: pointer;
+}
+
+.route-info-link:hover {
+    background: rgba(100, 181, 246, 0.2);
+}
+
+.route-info-link[hidden] {
+    display: none;
+}
