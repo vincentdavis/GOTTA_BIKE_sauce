@@ -35,6 +35,7 @@ let storedAthleteData = {};
 let currentSort = { column: 'wkg60', ascending: false };
 let teamSort = { column: 'team', ascending: true };
 let zrRoutesData = null; // ZwiftRacing app routes data
+let currentRouteProfile = null; // Current event route profile (Flat, Rolling, Hilly, Mountainous)
 
 // All available columns for the heatmap
 // Categories: info, power_watts, power_wkg, power_model, profile, race_stats, race_ranking, physical
@@ -99,6 +100,7 @@ const AVAILABLE_COLUMNS = [
     { id: 'raceRating90', label: 'Rating 90d', category: 'race_ranking', dataKey: 'race_max90_rating', format: 'decimal1' },
     { id: 'raceMixedCat', label: 'Mixed Cat', category: 'race_ranking', dataKey: 'race_current_mixed_category', format: 'text' },
     { id: 'raceMixedRank', label: 'Mixed Rank', category: 'race_ranking', dataKey: 'race_current_mixed_number', format: 'number' },
+    { id: 'adjustedRating', label: 'Adj Rating', category: 'race_ranking', dataKey: 'adjusted_rating', format: 'decimal1', calculated: true },
 ];
 
 // Column categories for grouping in UI
@@ -934,6 +936,33 @@ function getZRRouteInfo(routeId) {
 }
 
 /**
+ * Calculate adjusted rating based on current route profile
+ * Formula: race_current_rating + profile_suitability
+ */
+function calculateAdjustedRating(athleteData) {
+    if (!athleteData || !currentRouteProfile) return null;
+
+    const baseRating = athleteData.race_current_rating;
+    if (baseRating === undefined || baseRating === null) return null;
+
+    // Map route profile to athlete's profile suitability field
+    const profileMap = {
+        'flat': 'handicaps_profile_flat',
+        'rolling': 'handicaps_profile_rolling',
+        'hilly': 'handicaps_profile_hilly',
+        'mountainous': 'handicaps_profile_mountainous'
+    };
+
+    const profileKey = profileMap[currentRouteProfile];
+    if (!profileKey) return baseRating;
+
+    const profileSuitability = athleteData[profileKey];
+    if (profileSuitability === undefined || profileSuitability === null) return baseRating;
+
+    return baseRating + profileSuitability;
+}
+
+/**
  * Display route info for a subgroup
  */
 async function displayRouteInfo(subgroup) {
@@ -951,11 +980,15 @@ async function displayRouteInfo(subgroup) {
         if (routeWorldEl) routeWorldEl.textContent = '';
         if (routeProfileEl) routeProfileEl.textContent = '';
         if (routeDifficultyEl) routeDifficultyEl.textContent = '';
+        currentRouteProfile = null;
         return;
     }
 
     // Get ZR route info for world, profile, difficulty
     const zrRoute = getZRRouteInfo(subgroup.routeId);
+
+    // Store current route profile for adjusted rating calculation
+    currentRouteProfile = zrRoute?.profile?.toLowerCase() || null;
 
     try {
         const route = await common.rpc.getRoute(subgroup.routeId);
@@ -1749,8 +1782,16 @@ function renderHeatmap() {
             const athleteData = storedAthleteData[id];
             if (!athleteData) return null;
 
+            // Calculate adjusted rating based on current route profile
+            const adjustedRating = calculateAdjustedRating(athleteData);
+
             const name = athleteData.name || e.firstName || `Athlete ${id}`;
-            return { id, name, athleteData, entrant: e };
+            return {
+                id,
+                name,
+                athleteData: { ...athleteData, adjusted_rating: adjustedRating },
+                entrant: e
+            };
         })
         .filter(r => r !== null);
 
