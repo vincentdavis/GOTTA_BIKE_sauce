@@ -1,0 +1,86 @@
+{
+  "error": false,
+  "timestamp": "2025-12-12T15:37:37.966Z",
+  "url": "https://ladder.cycleracing.club/rider/team/n/446",
+  "team": {
+    "name": "Coalition Galaxium",
+    "club": "Coalition",
+    "captain": "Covi Powell",
+    "viceCaptains": [
+      "Joshua Wallner",
+      "Sonja Weber"
+    ],
+    "ranks": [
+      {
+        "division": "Bronze",
+        "position": 9
+      },
+      {
+        "division": "Copper",
+        "position": 10
+      }
+    ],
+    "riders": [
+      {
+        "rider_id": "224887",
+        "name": ". Covi (COALITION)",
+        "profile": "/profile/224887"
+      },
+      {
+        "rider_id": "410234",
+        "name": "Sonja Weber (COALITION)",
+        "profile": "/profile/410234"
+      },
+      {
+        "rider_id": "1606546",
+        "name": "B. arb K🐦‍🔥(Coalition)",
+        "profile": "/profile/1606546"
+      },
+      {
+        "rider_id": "1644503",
+        "name": "Danielle Kuntz (COALITION)",
+        "profile": "/profile/1644503"
+      },
+      {
+        "rider_id": "4183864",
+        "name": "L. Liz (COALITION)",
+        "profile": "/profile/4183864"
+      },
+      {
+        "rider_id": "4457578",
+        "name": "Jane Simmonds (Coalition)",
+        "profile": "/profile/4457578"
+      },
+      {
+        "rider_id": "5389170",
+        "name": "Miranda Garcia",
+        "profile": "/profile/5389170"
+      },
+      {
+        "rider_id": "6164399",
+        "name": "C eline☕️🎄(Coalition)",
+        "profile": "/profile/6164399"
+      },
+      {
+        "rider_id": "6229689",
+        "name": "Sweet Hamothy (COALITION)",
+        "profile": "/profile/6229689"
+      },
+      {
+        "rider_id": "6948912",
+        "name": "Laurel Erickson [COALITION]",
+        "profile": "/profile/6948912"
+      },
+      {
+        "rider_id": "7280783",
+        "name": "M argo C🌵 (COALITION)",
+        "profile": "/profile/7280783"
+      },
+      {
+        "rider_id": "7404756",
+        "name": "Stefanie Olofsson (COALITION)",
+        "profile": "/profile/7404756"
+      }
+    ]
+  }
+}

@@ -4,7 +4,7 @@
     "description": "Display nearby riders with heart rate color-coded by HR zone",
     "author": "Vincent Davis",
     "website_url": "https://gotta.bike",
-    "version": "2.17.1",
+    "version": "2.18.1",
     "content_js": [],
     "content_css": [],
     "web_root": "pages",
@@ -32,6 +32,20 @@
             "frame": false,
             "default_bounds": {
                 "width": 600,
+                "height": 500,
+                "x": 100,
+                "y": 100
+            }
+        },
+        {
+            "file": "pages/club-ladder.html",
+            "id": "club-ladder",
+            "name": "Club Ladder",
+            "description": "Compare two teams using GOTTA.BIKE data",
+            "overlay": true,
+            "frame": false,
+            "default_bounds": {
+                "width": 700,
                 "height": 500,
                 "x": 100,
                 "y": 100

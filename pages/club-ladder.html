@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html data-settings-key="club-ladder-settings-v1">
+<head>
+    <meta charset="utf-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
+    <link rel="stylesheet" href="/pages/css/common.css"/>
+    <link rel="stylesheet" href="./css/club-ladder.css"/>
+</head>
+<body class="transparent-bg">
+    <div id="titlebar">
+        <header>
+            <div class="logo"><img src="/pages/images/icon128.png"/></div>
+            <div class="title">Club Ladder</div>
+            <div class="filler"></div>
+            <div class="buttons">
+                <a class="button open-settings" href="club-ladder-settings.html?width=700&height=600&child-window"
+                   title="Open settings window" target="club-ladder-settings"><ms>settings</ms></a>
+                <div title="Close this window" class="button close electron-only"><ms>close</ms></div>
+            </div>
+        </header>
+    </div>
+
+    <div id="content">
+        <div class="team-inputs">
+            <div class="team-input-section" id="home-team-section">
+                <h3><span class="team-badge home">HOME</span> Team</h3>
+                <textarea id="home-team-json" placeholder="Paste team JSON here..."></textarea>
+                <div class="input-actions">
+                    <button type="button" id="load-home-btn" class="primary">Load Home Team</button>
+                    <button type="button" id="clear-home-btn">Clear</button>
+                </div>
+                <div class="team-info" id="home-team-info" hidden>
+                    <div class="team-name" id="home-team-name"></div>
+                    <div class="team-details">
+                        <span id="home-team-captain"></span>
+                        <span id="home-team-rank"></span>
+                        <span id="home-team-riders"></span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="team-input-section" id="away-team-section">
+                <h3><span class="team-badge away">AWAY</span> Team</h3>
+                <textarea id="away-team-json" placeholder="Paste team JSON here..."></textarea>
+                <div class="input-actions">
+                    <button type="button" id="load-away-btn" class="primary">Load Away Team</button>
+                    <button type="button" id="clear-away-btn">Clear</button>
+                </div>
+                <div class="team-info" id="away-team-info" hidden>
+                    <div class="team-name" id="away-team-name"></div>
+                    <div class="team-details">
+                        <span id="away-team-captain"></span>
+                        <span id="away-team-rank"></span>
+                        <span id="away-team-riders"></span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="action-row" id="import-section" hidden>
+            <button type="button" id="import-btn">Import GOTTA.BIKE Data</button>
+            <span id="import-status"></span>
+        </div>
+
+        <div id="loading" hidden>
+            <div class="spinner"></div>
+            <span>Loading...</span>
+        </div>
+
+        <div id="error" class="error" hidden></div>
+
+        <div id="comparison-container">
+            <div id="comparison-table-wrapper"></div>
+        </div>
+
+        <div id="no-data" class="no-data" hidden>
+            <p>No team data loaded.</p>
+            <p>Paste team JSON above and click "Load Team" to get started.</p>
+        </div>
+
+        <!-- Tooltip -->
+        <div id="comparison-tooltip" class="comparison-tooltip" hidden>
+            <div class="tooltip-rider"></div>
+            <div class="tooltip-metric"></div>
+            <div class="tooltip-stats"></div>
+        </div>
+
+        <!-- Rider details modal -->
+        <div id="rider-modal" class="rider-modal-overlay" hidden>
+            <div class="rider-modal">
+                <div class="rider-modal-header">
+                    <span class="rider-modal-title"></span>
+                    <button class="rider-modal-close" title="Close">&times;</button>
+                </div>
+                <div class="rider-modal-body"></div>
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        import {clubLadderMain} from './src/club-ladder.mjs';
+        clubLadderMain();
+    </script>
+</body>
+</html>

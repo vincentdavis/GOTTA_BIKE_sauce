@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html class="settings-page" data-settings-key="club-ladder-settings-v1">
+<head>
+    <meta charset="utf-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
+    <meta name="apple-mobile-web-app-capable" content="yes"/>
+
+    <title>Club Ladder Settings</title>
+
+    <link id="favicon" rel="shortcut icon" href="/pages/images/favicon.png"/>
+    <link rel="stylesheet" href="/pages/css/common.css"/>
+    <link rel="stylesheet" href="./css/club-ladder.css"/>
+</head>
+<body>
+    <div id="titlebar">
+        <header>
+            <div class="logo"><img src="/pages/images/icon128.png"/></div>
+            <div class="title">Club Ladder Settings</div>
+            <div class="filler"></div>
+            <div class="buttons">
+                <div title="Close this window" class="button close electron-only"><ms>close</ms></div>
+            </div>
+        </header>
+    </div>
+
+    <div class="tab-navigation">
+        <button type="button" class="tab-btn active" data-tab="settings-tab">Settings</button>
+        <button type="button" class="tab-btn" data-tab="extension-tab">Chrome Extension</button>
+        <button type="button" class="tab-btn" data-tab="help-tab">Help</button>
+    </div>
+
+    <div id="settings-tab" class="tab-panel active">
+        <div id="content" class="settings-content">
+            <section class="settings-section">
+                <h2>Display Options</h2>
+                <form id="display-options">
+                    <label>
+                        <key>Font scaling:</key>
+                        <input type="range" name="fontScale" min="0.5" max="2" step="0.1"/>
+                        <input type="number" name="fontScale" min="0.5" max="2" step="0.1" style="--size: 4"/>
+                    </label>
+                    <label>
+                        <key>Background:</key>
+                        <select name="backgroundOption">
+                            <option value="transparent">Transparent</option>
+                            <option value="black">Black</option>
+                            <option value="sauce">Sauce Default</option>
+                            <option value="darkGray">Dark Gray</option>
+                            <option value="darkBlue">Dark Blue</option>
+                            <option value="darkGreen">Dark Green</option>
+                            <option value="custom">Custom Color</option>
+                        </select>
+                    </label>
+                    <label class="custom-color-row">
+                        <key>Custom color:</key>
+                        <input type="color" name="customBackgroundColor" value="#232323"/>
+                    </label>
+                </form>
+            </section>
+
+            <section class="settings-section">
+                <h2>Table Columns</h2>
+                <p class="help-text">Select columns to display. Drag to reorder. Colors are based on min/median/max of each column.</p>
+
+                <div class="column-picker">
+                    <div class="column-picker-available">
+                        <h3>Available Columns</h3>
+                        <select id="available-category" class="category-filter">
+                            <option value="">All Categories</option>
+                        </select>
+                        <div id="available-columns" class="column-list"></div>
+                    </div>
+
+                    <div class="column-picker-buttons">
+                        <button type="button" id="add-column-btn" title="Add selected">&rarr;</button>
+                        <button type="button" id="remove-column-btn" title="Remove selected">&larr;</button>
+                        <button type="button" id="move-up-btn" title="Move up">&uarr;</button>
+                        <button type="button" id="move-down-btn" title="Move down">&darr;</button>
+                    </div>
+
+                    <div class="column-picker-selected">
+                        <h3>Selected Columns</h3>
+                        <div id="selected-columns" class="column-list"></div>
+                    </div>
+                </div>
+
+                <div class="column-picker-actions">
+                    <button type="button" id="reset-columns-btn">Reset to Defaults</button>
+                </div>
+            </section>
+
+            <section class="settings-section">
+                <h2>Sorting</h2>
+                <form id="sort-options">
+                    <label>
+                        <key>Default sort column:</key>
+                        <select name="defaultSortColumn" id="sort-column-select">
+                            <!-- Populated dynamically -->
+                        </select>
+                    </label>
+                    <label>
+                        <key>Sort direction:</key>
+                        <select name="defaultSortAscending">
+                            <option value="false">Descending (highest first)</option>
+                            <option value="true">Ascending (lowest first)</option>
+                        </select>
+                    </label>
+                </form>
+            </section>
+        </div>
+    </div>
+
+    <div id="extension-tab" class="tab-panel">
+        <div class="settings-content">
+            <section class="settings-section">
+                <h2>GOTTA.BIKE Ladder Chrome Extension</h2>
+                <p class="help-text">
+                    The Chrome extension allows you to easily export team data from the
+                    <a href="https://ladder.cycleracing.club" target="_blank" style="color: #6af;">Cycle Racing Club Ladder</a>
+                    website in the JSON format needed for this tool.
+                </p>
+
+                <div class="download-section">
+                    <h3>Download Extension</h3>
+                    <p>
+                        Download and install the Chrome extension to export team rosters from ladder.cycleracing.club.
+                        After downloading, unzip the file and load it as an unpacked extension in Chrome.
+                    </p>
+                    <a href="./chrome_extension/GOTTA_BIKE_ladder_1.1.0.zip" download class="download-btn">
+                        <ms>download</ms>
+                        Download Extension (v1.1.0)
+                    </a>
+                </div>
+
+                <div style="margin-top: 1.5em;">
+                    <h3>Installation Instructions</h3>
+                    <ol style="color: #aaa; font-size: 0.9em; line-height: 1.6;">
+                        <li>Download the ZIP file above</li>
+                        <li>Extract/unzip the downloaded file</li>
+                        <li>Open Chrome and go to <code style="background: #333; padding: 2px 6px; border-radius: 3px;">chrome://extensions</code></li>
+                        <li>Enable "Developer mode" (toggle in top right)</li>
+                        <li>Click "Load unpacked" and select the extracted folder</li>
+                        <li>Navigate to a team page on ladder.cycleracing.club</li>
+                        <li>Click the extension icon to copy team JSON</li>
+                        <li>Paste the JSON into the Club Ladder window</li>
+                    </ol>
+                </div>
+            </section>
+        </div>
+    </div>
+
+    <div id="help-tab" class="tab-panel">
+        <div class="settings-content">
+            <section class="settings-section">
+                <h2>How to Use Club Ladder</h2>
+                <div style="color: #aaa; font-size: 0.9em; line-height: 1.6;">
+                    <h3 style="color: #fff; margin-top: 0;">Getting Team Data</h3>
+                    <p>
+                        Use the Chrome extension (available in the Chrome Extension tab) to export team rosters
+                        from <a href="https://ladder.cycleracing.club" target="_blank" style="color: #6af;">ladder.cycleracing.club</a>.
+                    </p>
+
+                    <h3 style="color: #fff;">Comparing Teams</h3>
+                    <ol>
+                        <li>Paste the Home team JSON and click "Load Home Team"</li>
+                        <li>Paste the Away team JSON and click "Load Away Team"</li>
+                        <li>Click "Import GOTTA.BIKE Data" to fetch power profiles</li>
+                        <li>View the comparison table with color-coded metrics</li>
+                    </ol>
+
+                    <h3 style="color: #fff;">Understanding the Colors</h3>
+                    <p>
+                        The table uses a color scale from green (lower values) to red (higher values).
+                        Colors are calculated relative to all riders in the comparison - so a red cell
+                        indicates that rider has one of the highest values for that metric.
+                    </p>
+
+                    <h3 style="color: #fff;">Clicking Rider Names</h3>
+                    <p>
+                        Click on any rider name to view their full GOTTA.BIKE profile data and
+                        links to external profiles (ZwiftPower, ZwiftRacing, GOTTA.BIKE).
+                    </p>
+                </div>
+            </section>
+        </div>
+    </div>
+
+    <script type="module">
+        import {clubLadderSettingsMain} from './src/club-ladder.mjs';
+        clubLadderSettingsMain();
+    </script>
+</body>
+</html>

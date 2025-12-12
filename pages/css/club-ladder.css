@@ -1,0 +1,827 @@
+/* Club Ladder Window Styles */
+
+:root {
+    --font-scale: 1;
+    --background-color: #000000;
+}
+
+body {
+    font-size: calc(14px * var(--font-scale));
+    overflow: hidden;
+    margin: 0;
+    height: 100vh;
+}
+
+body.transparent-bg {
+    background: transparent;
+}
+
+body.solid-background {
+    background: var(--background-color);
+}
+
+#content {
+    padding: 0.5em;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5em;
+    height: calc(100vh - 40px);
+    overflow-y: auto;
+    overflow-x: hidden;
+    box-sizing: border-box;
+}
+
+/* Team Input Section */
+.team-inputs {
+    display: flex;
+    gap: 1em;
+    flex-wrap: wrap;
+}
+
+.team-input-section {
+    flex: 1;
+    min-width: 280px;
+    background: rgba(0, 0, 0, 0.3);
+    border-radius: 6px;
+    padding: 0.8em;
+}
+
+.team-input-section h3 {
+    margin: 0 0 0.5em 0;
+    font-size: 1em;
+    color: #fff;
+    display: flex;
+    align-items: center;
+    gap: 0.5em;
+}
+
+.team-input-section h3 .team-badge {
+    padding: 0.15em 0.5em;
+    border-radius: 3px;
+    font-size: 0.8em;
+    font-weight: 600;
+}
+
+.team-badge.home {
+    background: #2196F3;
+    color: #fff;
+}
+
+.team-badge.away {
+    background: #f44336;
+    color: #fff;
+}
+
+.team-input-section textarea {
+    width: 100%;
+    height: 80px;
+    padding: 0.5em;
+    border: 1px solid #555;
+    border-radius: 4px;
+    background: #222;
+    color: #fff;
+    font-family: monospace;
+    font-size: 0.85em;
+    resize: vertical;
+    box-sizing: border-box;
+}
+
+.team-input-section textarea:focus {
+    outline: none;
+    border-color: #4a9eff;
+}
+
+.team-input-section .input-actions {
+    display: flex;
+    gap: 0.5em;
+    margin-top: 0.5em;
+}
+
+.team-input-section button {
+    padding: 0.4em 1em;
+    border: 1px solid #555;
+    border-radius: 3px;
+    background: #444;
+    color: #fff;
+    cursor: pointer;
+    font-size: 0.9em;
+}
+
+.team-input-section button:hover:not(:disabled) {
+    background: #555;
+}
+
+.team-input-section button.primary {
+    background: #2a6099;
+}
+
+.team-input-section button.primary:hover:not(:disabled) {
+    background: #3575b8;
+}
+
+.team-input-section button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+/* Team Info Display */
+.team-info {
+    margin-top: 0.8em;
+    padding-top: 0.8em;
+    border-top: 1px solid #444;
+}
+
+.team-info:not([hidden]) {
+    display: block;
+}
+
+.team-info .team-name {
+    font-weight: bold;
+    font-size: 1.1em;
+    color: #fff;
+    margin-bottom: 0.3em;
+}
+
+.team-info .team-details {
+    font-size: 0.85em;
+    color: #aaa;
+}
+
+.team-info .team-details span {
+    margin-right: 1em;
+}
+
+.team-info .team-rank {
+    display: inline-block;
+    padding: 0.15em 0.5em;
+    border-radius: 3px;
+    font-weight: 500;
+    font-size: 0.85em;
+}
+
+.team-rank.Bronze { background: #cd7f32; color: #fff; }
+.team-rank.Silver { background: #c0c0c0; color: #000; }
+.team-rank.Gold { background: #ffd700; color: #000; }
+.team-rank.Platinum { background: #e5e4e2; color: #000; }
+.team-rank.Diamond { background: #b9f2ff; color: #000; }
+.team-rank.Copper { background: #b87333; color: #fff; }
+
+/* Action Row */
+.action-row {
+    display: flex;
+    align-items: center;
+    gap: 0.5em;
+    padding: 0.5em;
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 4px;
+}
+
+.action-row button {
+    padding: 0.4em 1em;
+    border: 1px solid #555;
+    border-radius: 3px;
+    background: #2a6099;
+    color: #fff;
+    cursor: pointer;
+}
+
+.action-row button:hover:not(:disabled) {
+    background: #3575b8;
+}
+
+.action-row button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+#import-status {
+    font-size: 0.85em;
+    color: #aaa;
+}
+
+#import-status.success {
+    color: #4caf50;
+}
+
+#import-status.error {
+    color: #f44336;
+}
+
+/* Loading */
+#loading {
+    align-items: center;
+    justify-content: center;
+    gap: 0.5em;
+    padding: 2em;
+    color: #aaa;
+}
+
+#loading:not([hidden]) {
+    display: flex;
+}
+
+.spinner {
+    width: 20px;
+    height: 20px;
+    border: 2px solid #555;
+    border-top-color: #fff;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+/* Error */
+.error {
+    padding: 0.5em;
+    background: rgba(244, 67, 54, 0.2);
+    border: 1px solid #f44336;
+    border-radius: 4px;
+    color: #f44336;
+}
+
+/* No Data */
+.no-data {
+    text-align: center;
+    padding: 2em;
+    color: #888;
+}
+
+.no-data p {
+    margin: 0.5em 0;
+}
+
+/* Comparison Table */
+#comparison-container {
+    flex: 1;
+    overflow: auto;
+}
+
+.comparison-table {
+    border-collapse: collapse;
+    width: 100%;
+    table-layout: auto;
+}
+
+.comparison-table th,
+.comparison-table td {
+    padding: 4px 8px;
+    text-align: center;
+    border: 1px solid #333;
+    white-space: nowrap;
+}
+
+.comparison-table th {
+    background: #1a1a1a;
+    color: #ccc;
+    font-size: 11px;
+    font-weight: normal;
+    position: sticky;
+    top: 0;
+    z-index: 10;
+}
+
+.comparison-table th.sortable {
+    cursor: pointer;
+    user-select: none;
+}
+
+.comparison-table th.sortable:hover {
+    color: #fff;
+    font-weight: bold;
+    background: #2a2a2a;
+}
+
+.comparison-table th.sorted {
+    font-weight: bold;
+    color: #fff;
+}
+
+.comparison-table .team-col {
+    text-align: center;
+    min-width: 50px;
+}
+
+.comparison-table .team-cell {
+    font-weight: 600;
+    font-size: 10px;
+}
+
+.comparison-table .team-cell.home {
+    background: rgba(33, 150, 243, 0.3);
+    color: #64b5f6;
+}
+
+.comparison-table .team-cell.away {
+    background: rgba(244, 67, 54, 0.3);
+    color: #ef9a9a;
+}
+
+.comparison-table .rider-col {
+    text-align: left;
+    min-width: 100px;
+    max-width: 150px;
+}
+
+.comparison-table .rider-name {
+    text-align: left;
+    max-width: 150px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    background: #1a1a1a;
+    color: #ccc;
+    font-size: 11px;
+}
+
+.comparison-table .rider-name.clickable {
+    cursor: pointer;
+    color: #6af;
+}
+
+.comparison-table .rider-name.clickable:hover {
+    color: #8cf;
+    text-decoration: underline;
+}
+
+.comparison-table .metric-cell {
+    color: #fff;
+    font-size: 10px;
+    font-weight: bold;
+    transition: filter 0.1s;
+}
+
+.comparison-table .metric-cell:hover {
+    filter: brightness(1.2);
+}
+
+/* Color tiers (8 levels: 0-100 normalized) */
+.color-tier-0 { background: #555555; }
+.color-tier-1 { background: #33BB33; }
+.color-tier-2 { background: #77CC33; }
+.color-tier-3 { background: #BBDD33; }
+.color-tier-4 { background: #FFDD44; }
+.color-tier-5 { background: #FFAA33; }
+.color-tier-6 { background: #FF6633; }
+.color-tier-7 { background: #FF2222; }
+
+/* Tooltip */
+.comparison-tooltip {
+    position: fixed;
+    background: #333;
+    color: #fff;
+    padding: 8px;
+    border-radius: 4px;
+    border: 1px solid #555;
+    z-index: 1000;
+    pointer-events: none;
+    font-size: 12px;
+    max-width: 250px;
+}
+
+.comparison-tooltip .tooltip-rider {
+    font-weight: bold;
+    margin-bottom: 4px;
+}
+
+.comparison-tooltip .tooltip-metric {
+    margin-bottom: 4px;
+}
+
+.comparison-tooltip .tooltip-stats {
+    font-size: 10px;
+    color: #999;
+}
+
+/* Rider Details Modal */
+.rider-modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.7);
+    z-index: 2000;
+    align-items: center;
+    justify-content: center;
+}
+
+.rider-modal-overlay:not([hidden]) {
+    display: flex;
+}
+
+.rider-modal {
+    background: #2a2a2a;
+    border: 1px solid #555;
+    border-radius: 8px;
+    max-width: 500px;
+    max-height: 80vh;
+    width: 90%;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+
+.rider-modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 16px;
+    background: #1a1a1a;
+    border-bottom: 1px solid #444;
+}
+
+.rider-modal-title {
+    font-weight: bold;
+    font-size: 1.1em;
+    color: #fff;
+}
+
+.rider-modal-close {
+    background: none;
+    border: none;
+    color: #aaa;
+    font-size: 1.5em;
+    cursor: pointer;
+    padding: 0;
+    line-height: 1;
+}
+
+.rider-modal-close:hover {
+    color: #fff;
+}
+
+.rider-modal-body {
+    padding: 16px;
+    overflow-y: auto;
+    flex: 1;
+}
+
+.rider-profile-links {
+    display: flex;
+    gap: 16px;
+    margin-bottom: 16px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid #444;
+}
+
+.rider-profile-links a {
+    color: #6af;
+    text-decoration: none;
+    font-size: 0.9em;
+}
+
+.rider-profile-links a:hover {
+    color: #8cf;
+    text-decoration: underline;
+}
+
+/* Athlete Details Panel */
+.athlete-details-content {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 20px;
+}
+
+.details-section {
+    min-width: 150px;
+    flex: 1;
+}
+
+.details-section-title {
+    font-size: 0.8em;
+    font-weight: 600;
+    color: #2196F3;
+    margin-bottom: 8px;
+    padding-bottom: 4px;
+    border-bottom: 1px solid rgba(33, 150, 243, 0.3);
+}
+
+.details-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.details-item {
+    display: flex;
+    gap: 8px;
+    font-size: 0.85em;
+}
+
+.details-label {
+    color: #888;
+    min-width: 90px;
+}
+
+.details-value {
+    color: #fff;
+}
+
+.no-gotta-data {
+    color: #888;
+    font-style: italic;
+    font-size: 0.9em;
+    padding: 10px 0;
+}
+
+/* Settings Page Styles */
+body:not(.transparent-bg) #titlebar {
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    background: #1a1a1a;
+}
+
+body:not(.transparent-bg) {
+    overflow-y: auto;
+    overflow-x: hidden;
+}
+
+.settings-content {
+    padding: 1em;
+    box-sizing: border-box;
+}
+
+.settings-section {
+    margin-bottom: 1.5em;
+    padding: 1em;
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 6px;
+}
+
+.settings-section h2 {
+    margin: 0 0 0.8em 0;
+    padding-bottom: 0.3em;
+    border-bottom: 1px solid #555;
+    font-size: 1.1em;
+}
+
+.settings-section h3 {
+    margin: 0.8em 0 0.5em 0;
+    font-size: 0.95em;
+    color: #aaa;
+}
+
+.settings-section form {
+    display: flex;
+    flex-direction: column;
+    gap: 0.6em;
+}
+
+.settings-section label {
+    display: flex;
+    align-items: center;
+    gap: 0.5em;
+}
+
+.settings-section label key {
+    min-width: 140px;
+    color: #ccc;
+}
+
+.settings-section input[type="number"] {
+    width: calc(var(--size, 6) * 1ch + 2em);
+    padding: 0.3em 0.5em;
+    border: 1px solid #555;
+    border-radius: 3px;
+    background: #333;
+    color: #fff;
+}
+
+.settings-section input[type="range"] {
+    flex: 1;
+    max-width: 150px;
+}
+
+.settings-section select {
+    padding: 0.3em 0.5em;
+    border: 1px solid #555;
+    border-radius: 3px;
+    background: #333;
+    color: #fff;
+}
+
+.settings-section input[type="checkbox"] {
+    width: 16px;
+    height: 16px;
+}
+
+.settings-section input[type="color"] {
+    width: 50px;
+    height: 30px;
+    padding: 0;
+    border: 1px solid #555;
+    border-radius: 3px;
+    background: #333;
+    cursor: pointer;
+}
+
+.custom-color-row {
+    display: none;
+}
+
+.help-text {
+    font-size: 0.85em;
+    color: #888;
+    margin: 0 0 1em 0;
+}
+
+/* Tab Navigation */
+.tab-navigation {
+    display: flex;
+    background: #252525;
+    border-bottom: 1px solid #444;
+    padding: 0 0.5em;
+    position: sticky;
+    top: 40px;
+    z-index: 99;
+}
+
+.tab-btn {
+    padding: 0.6em 1em;
+    background: transparent;
+    border: none;
+    border-bottom: 2px solid transparent;
+    color: #aaa;
+    cursor: pointer;
+    font-size: 0.9em;
+    transition: all 0.2s;
+}
+
+.tab-btn:hover {
+    color: #fff;
+    background: rgba(255, 255, 255, 0.05);
+}
+
+.tab-btn.active {
+    color: #fff;
+    border-bottom-color: #4caf50;
+}
+
+.tab-panel {
+    display: none;
+}
+
+.tab-panel.active {
+    display: block;
+}
+
+/* Column Picker Styles */
+.column-picker {
+    display: flex;
+    gap: 0.5em;
+    margin-top: 1em;
+}
+
+.column-picker-available,
+.column-picker-selected {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+
+.column-picker h3 {
+    margin: 0 0 0.5em 0;
+    font-size: 0.9em;
+    color: #aaa;
+}
+
+.category-filter {
+    margin-bottom: 0.5em;
+    padding: 0.3em;
+    border: 1px solid #555;
+    border-radius: 3px;
+    background: #333;
+    color: #fff;
+    font-size: 0.85em;
+}
+
+.column-list {
+    flex: 1;
+    min-height: 200px;
+    max-height: 300px;
+    overflow-y: auto;
+    border: 1px solid #555;
+    border-radius: 4px;
+    background: #2a2a2a;
+}
+
+.column-item {
+    padding: 0.4em 0.6em;
+    cursor: pointer;
+    border-bottom: 1px solid #3a3a3a;
+    font-size: 0.85em;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.column-item:last-child {
+    border-bottom: none;
+}
+
+.column-item:hover {
+    background: #3a3a3a;
+}
+
+.column-item.selected {
+    background: #2a5a8a;
+}
+
+.column-item .column-category {
+    font-size: 0.75em;
+    color: #888;
+    margin-left: 0.5em;
+}
+
+.column-picker-buttons {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 0.3em;
+    padding: 0 0.3em;
+}
+
+.column-picker-buttons button {
+    padding: 0.4em 0.6em;
+    border: 1px solid #555;
+    border-radius: 3px;
+    background: #444;
+    color: #fff;
+    cursor: pointer;
+    font-size: 1em;
+    min-width: 32px;
+}
+
+.column-picker-buttons button:hover:not(:disabled) {
+    background: #555;
+}
+
+.column-picker-buttons button:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+.column-picker-actions {
+    margin-top: 1em;
+    display: flex;
+    gap: 0.5em;
+}
+
+.column-picker-actions button {
+    padding: 0.4em 1em;
+    border: 1px solid #555;
+    border-radius: 3px;
+    background: #444;
+    color: #fff;
+    cursor: pointer;
+}
+
+.column-picker-actions button:hover {
+    background: #555;
+}
+
+/* Download Section */
+.download-section {
+    margin-top: 1em;
+    padding: 1em;
+    background: rgba(33, 150, 243, 0.1);
+    border: 1px solid rgba(33, 150, 243, 0.3);
+    border-radius: 6px;
+}
+
+.download-section h3 {
+    margin: 0 0 0.5em 0;
+    color: #64b5f6;
+}
+
+.download-section p {
+    margin: 0 0 1em 0;
+    font-size: 0.9em;
+    color: #aaa;
+}
+
+.download-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5em;
+    padding: 0.6em 1.2em;
+    background: #2196F3;
+    color: #fff;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.95em;
+    text-decoration: none;
+}
+
+.download-btn:hover {
+    background: #1976D2;
+}
+
+.download-btn ms {
+    font-size: 1.2em;
+}
