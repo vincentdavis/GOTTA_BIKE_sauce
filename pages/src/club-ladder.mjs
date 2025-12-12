@@ -21,6 +21,22 @@ let homeTeam = null;
 let awayTeam = null;
 let storedAthleteData = {};
 let currentSort = { column: 'wkg60', ascending: false };
+let notRacingRiders = new Set(); // Set of rider IDs marked as not racing
+let currentRouteProfile = null; // Selected route profile: flat, rolling, hilly, mountainous
+
+// Chart instances for cleanup
+let radarChartPowerWkg = null;
+let radarChartPowerWatts = null;
+let radarChartPhenotype = null;
+
+// Route profile options
+const ROUTE_PROFILES = [
+    { id: '', label: 'No Route Selected' },
+    { id: 'flat', label: 'Flat' },
+    { id: 'rolling', label: 'Rolling' },
+    { id: 'hilly', label: 'Hilly' },
+    { id: 'mountainous', label: 'Mountainous' }
+];
 
 // All available columns for the comparison table
 const AVAILABLE_COLUMNS = [
@@ -50,10 +66,17 @@ const AVAILABLE_COLUMNS = [
     // Physical
     { id: 'weight', label: 'Weight', category: 'physical', dataKey: 'weight', format: 'decimal1', suffix: 'kg' },
 
+    // Profile Suitability (stored as 0-1, display as percentage)
+    { id: 'profileFlat', label: 'Flat %', category: 'profile', dataKey: 'handicaps_profile_flat', format: 'percent' },
+    { id: 'profileRolling', label: 'Rolling %', category: 'profile', dataKey: 'handicaps_profile_rolling', format: 'percent' },
+    { id: 'profileHilly', label: 'Hilly %', category: 'profile', dataKey: 'handicaps_profile_hilly', format: 'percent' },
+    { id: 'profileMountain', label: 'Mountain %', category: 'profile', dataKey: 'handicaps_profile_mountainous', format: 'percent' },
+
     // Race Ranking
     { id: 'raceRating', label: 'Rating', category: 'race_ranking', dataKey: 'race_current_rating', format: 'decimal1' },
     { id: 'raceRating30', label: 'Rating 30d', category: 'race_ranking', dataKey: 'race_max30_rating', format: 'decimal1' },
     { id: 'raceRating90', label: 'Rating 90d', category: 'race_ranking', dataKey: 'race_max90_rating', format: 'decimal1' },
+    { id: 'adjustedRating', label: 'Adj Rating', category: 'race_ranking', dataKey: 'adjusted_rating', format: 'decimal1', calculated: true },
 ];
 
 // Column categories for grouping in UI
@@ -62,6 +85,7 @@ const COLUMN_CATEGORIES = {
     power_wkg: 'Power (W/kg)',
     power_model: 'Power Model',
     physical: 'Physical',
+    profile: 'Profile Suitability',
     race_ranking: 'Race Ranking'
 };
 
@@ -79,10 +103,134 @@ common.settingsStore.setDefault({
 });
 
 /**
+ * Capture the content area and copy to clipboard as an image
+ * Excludes elements with data-exclude-capture attribute
+ */
+async function captureAndShare() {
+    const shareBtn = document.getElementById('share-btn');
+    const content = document.getElementById('content');
+
+    if (!content || !window.html2canvas) {
+        console.error('Cannot capture: content not found or html2canvas not loaded');
+        return;
+    }
+
+    // Show loading state
+    const originalTitle = shareBtn?.getAttribute('title');
+    if (shareBtn) {
+        shareBtn.classList.add('sharing');
+        shareBtn.setAttribute('title', 'Capturing...');
+    }
+
+    try {
+        // Store original styles
+        const originalStyles = {
+            height: content.style.height,
+            maxHeight: content.style.maxHeight,
+            overflow: content.style.overflow,
+            background: content.style.background
+        };
+
+        // Get background color
+        const computedBg = getComputedStyle(document.body).getPropertyValue('--background-color') || '#000000';
+
+        // Temporarily expand content to full height for capture
+        content.style.height = 'auto';
+        content.style.maxHeight = 'none';
+        content.style.overflow = 'visible';
+        content.style.background = computedBg;
+
+        // Scroll to top to ensure consistent capture
+        content.scrollTop = 0;
+
+        // Wait for layout to settle
+        await new Promise(resolve => setTimeout(resolve, 100));
+
+        // Capture the full content, excluding elements with data-exclude-capture
+        const canvas = await html2canvas(content, {
+            backgroundColor: computedBg,
+            scale: 2, // Higher resolution
+            logging: false,
+            useCORS: true,
+            allowTaint: true,
+            windowHeight: content.scrollHeight,
+            height: content.scrollHeight,
+            ignoreElements: (element) => element.hasAttribute('data-exclude-capture')
+        });
+
+        // Restore original styles
+        content.style.height = originalStyles.height;
+        content.style.maxHeight = originalStyles.maxHeight;
+        content.style.overflow = originalStyles.overflow;
+        content.style.background = originalStyles.background;
+
+        // Convert to blob
+        const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
+
+        // Try to copy to clipboard
+        if (navigator.clipboard && navigator.clipboard.write) {
+            await navigator.clipboard.write([
+                new ClipboardItem({ 'image/png': blob })
+            ]);
+            showShareFeedback('Copied to clipboard!', 'success');
+        } else {
+            // Fallback: download the image
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `club-ladder-${Date.now()}.png`;
+            a.click();
+            URL.revokeObjectURL(url);
+            showShareFeedback('Downloaded image', 'success');
+        }
+    } catch (err) {
+        console.error('Share failed:', err);
+        showShareFeedback('Share failed', 'error');
+    } finally {
+        // Restore button state
+        if (shareBtn) {
+            shareBtn.classList.remove('sharing');
+            shareBtn.setAttribute('title', originalTitle || 'Copy image to clipboard');
+        }
+    }
+}
+
+/**
+ * Show feedback message after share attempt
+ */
+function showShareFeedback(message, type) {
+    // Remove existing feedback
+    const existing = document.querySelector('.share-feedback');
+    if (existing) existing.remove();
+
+    const feedback = document.createElement('div');
+    feedback.className = `share-feedback share-feedback-${type}`;
+    feedback.textContent = message;
+    document.body.appendChild(feedback);
+
+    // Animate in
+    requestAnimationFrame(() => {
+        feedback.classList.add('visible');
+    });
+
+    // Remove after delay
+    setTimeout(() => {
+        feedback.classList.remove('visible');
+        setTimeout(() => feedback.remove(), 300);
+    }, 2000);
+}
+
+/**
  * Main entry point for Club Ladder window
  */
 export async function clubLadderMain() {
     common.initInteractionListeners();
+
+    // Setup share button
+    const shareBtn = document.getElementById('share-btn');
+    if (shareBtn) {
+        shareBtn.addEventListener('click', captureAndShare);
+    }
 
     // Load stored athlete data (for cached GOTTA.BIKE data)
     loadStoredAthleteData();
@@ -100,6 +248,7 @@ export async function clubLadderMain() {
 
     // Setup UI
     setupTeamInputs();
+    setupRouteSelector();
     setupImportButton();
     setupTooltip();
     setupRiderModal();
@@ -212,6 +361,12 @@ function setupTeamInputs() {
 
     if (clearHomeBtn) {
         clearHomeBtn.addEventListener('click', () => {
+            // Clear notRacing state for home team riders
+            if (homeTeam?.riders) {
+                for (const r of homeTeam.riders) {
+                    notRacingRiders.delete(r.rider_id);
+                }
+            }
             homeTeam = null;
             if (homeTextarea) homeTextarea.value = '';
             document.getElementById('home-team-info').hidden = true;
@@ -233,12 +388,69 @@ function setupTeamInputs() {
 
     if (clearAwayBtn) {
         clearAwayBtn.addEventListener('click', () => {
+            // Clear notRacing state for away team riders
+            if (awayTeam?.riders) {
+                for (const r of awayTeam.riders) {
+                    notRacingRiders.delete(r.rider_id);
+                }
+            }
             awayTeam = null;
             if (awayTextarea) awayTextarea.value = '';
             document.getElementById('away-team-info').hidden = true;
             updateUI();
         });
     }
+}
+
+/**
+ * Setup route profile selector
+ */
+function setupRouteSelector() {
+    const select = document.getElementById('route-profile-select');
+    if (!select) return;
+
+    // Populate options
+    for (const profile of ROUTE_PROFILES) {
+        const option = document.createElement('option');
+        option.value = profile.id;
+        option.textContent = profile.label;
+        select.appendChild(option);
+    }
+
+    // Handle change
+    select.addEventListener('change', () => {
+        currentRouteProfile = select.value || null;
+        if (homeTeam || awayTeam) {
+            renderComparisonTable();
+        }
+    });
+}
+
+/**
+ * Calculate adjusted rating based on route profile
+ * Formula: race_current_rating + profile_suitability
+ */
+function calculateAdjustedRating(athleteData) {
+    if (!athleteData || !currentRouteProfile) return null;
+
+    const baseRating = athleteData.race_current_rating;
+    if (baseRating === undefined || baseRating === null) return null;
+
+    // Map route profile to athlete's profile suitability field
+    const profileMap = {
+        'flat': 'handicaps_profile_flat',
+        'rolling': 'handicaps_profile_rolling',
+        'hilly': 'handicaps_profile_hilly',
+        'mountainous': 'handicaps_profile_mountainous'
+    };
+
+    const profileKey = profileMap[currentRouteProfile];
+    if (!profileKey) return baseRating;
+
+    const profileSuitability = athleteData[profileKey];
+    if (profileSuitability === undefined || profileSuitability === null) return baseRating;
+
+    return baseRating + profileSuitability;
 }
 
 /**
@@ -533,22 +745,27 @@ function renderComparisonTable() {
     const visibleColumns = getSelectedColumns();
     if (visibleColumns.length === 0) {
         wrapper.innerHTML = '<div class="no-data"><p>No columns selected. Configure columns in Settings.</p></div>';
+        // Hide radar charts when no columns
+        const chartContainer = document.getElementById('radar-chart-container');
+        if (chartContainer) chartContainer.hidden = true;
         return;
     }
 
     // Build rider data from both teams
-    let riders = [];
+    let allRiders = [];
 
     if (homeTeam?.riders) {
         for (const r of homeTeam.riders) {
             const athleteData = storedAthleteData[r.rider_id];
-            riders.push({
+            // Calculate adjusted rating based on route profile
+            const adjustedRating = athleteData ? calculateAdjustedRating(athleteData) : null;
+            allRiders.push({
                 id: r.rider_id,
                 name: r.name,
                 profile: r.profile,
                 team: 'home',
                 teamName: homeTeam.name,
-                athleteData: athleteData || null
+                athleteData: athleteData ? { ...athleteData, adjusted_rating: adjustedRating } : null
             });
         }
     }
@@ -556,45 +773,87 @@ function renderComparisonTable() {
     if (awayTeam?.riders) {
         for (const r of awayTeam.riders) {
             const athleteData = storedAthleteData[r.rider_id];
-            riders.push({
+            // Calculate adjusted rating based on route profile
+            const adjustedRating = athleteData ? calculateAdjustedRating(athleteData) : null;
+            allRiders.push({
                 id: r.rider_id,
                 name: r.name,
                 profile: r.profile,
                 team: 'away',
                 teamName: awayTeam.name,
-                athleteData: athleteData || null
+                athleteData: athleteData ? { ...athleteData, adjusted_rating: adjustedRating } : null
             });
         }
     }
 
-    if (riders.length === 0) {
+    if (allRiders.length === 0) {
         wrapper.innerHTML = '<div class="no-data"><p>No riders loaded.</p></div>';
+        // Hide radar charts when no data
+        const chartContainer = document.getElementById('radar-chart-container');
+        if (chartContainer) chartContainer.hidden = true;
         return;
     }
 
-    // Sort riders
-    riders = sortRiders(riders, visibleColumns);
+    // Split into racing and not racing
+    const racingRiders = allRiders.filter(r => !notRacingRiders.has(r.id));
+    const notRacingRidersList = allRiders.filter(r => notRacingRiders.has(r.id));
 
-    // Calculate column statistics for color scaling
-    const columnStats = calculateColumnStats(riders, visibleColumns);
+    // Sort both lists
+    const sortedRacing = sortRiders(racingRiders, visibleColumns);
+    const sortedNotRacing = sortRiders(notRacingRidersList, visibleColumns);
 
-    // Build table
-    const table = document.createElement('table');
-    table.className = 'comparison-table';
-
-    // Header
-    const thead = buildTableHeader(visibleColumns);
-    table.appendChild(thead);
-
-    // Body
-    const tbody = buildTableBody(riders, visibleColumns, columnStats);
-    table.appendChild(tbody);
+    // Calculate column statistics for color scaling (based on racing riders only)
+    const columnStats = calculateColumnStats(sortedRacing, visibleColumns);
 
     wrapper.innerHTML = '';
-    wrapper.appendChild(table);
 
-    // Setup cell tooltips
+    // Racing table
+    if (sortedRacing.length > 0) {
+        const racingSection = document.createElement('div');
+        racingSection.className = 'table-section racing-section';
+
+        const table = document.createElement('table');
+        table.className = 'comparison-table';
+
+        const thead = buildTableHeader(visibleColumns, true);
+        table.appendChild(thead);
+
+        const tbody = buildTableBody(sortedRacing, visibleColumns, columnStats, true);
+        table.appendChild(tbody);
+
+        racingSection.appendChild(table);
+        wrapper.appendChild(racingSection);
+    }
+
+    // Not Racing table
+    if (sortedNotRacing.length > 0) {
+        const notRacingSection = document.createElement('div');
+        notRacingSection.className = 'table-section not-racing-section';
+
+        const divider = document.createElement('div');
+        divider.className = 'not-racing-divider';
+        divider.innerHTML = `<span>Not Racing (${sortedNotRacing.length})</span>`;
+        notRacingSection.appendChild(divider);
+
+        const table = document.createElement('table');
+        table.className = 'comparison-table not-racing-table';
+
+        const thead = buildTableHeader(visibleColumns, false);
+        table.appendChild(thead);
+
+        const tbody = buildTableBody(sortedNotRacing, visibleColumns, columnStats, false);
+        table.appendChild(tbody);
+
+        notRacingSection.appendChild(table);
+        wrapper.appendChild(notRacingSection);
+    }
+
+    // Setup cell tooltips for both tables
     setupCellTooltips(wrapper, visibleColumns, columnStats);
+
+    // Render radar charts based on racing riders only
+    const teamAggregates = calculateTeamAggregates(sortedRacing);
+    renderTeamRadarCharts(teamAggregates);
 }
 
 /**
@@ -665,9 +924,16 @@ function calculateColumnStats(riders, visibleColumns) {
 /**
  * Build table header
  */
-function buildTableHeader(visibleColumns) {
+function buildTableHeader(visibleColumns, isRacingTable = true) {
     const thead = document.createElement('thead');
     const tr = document.createElement('tr');
+
+    // Racing toggle column
+    const racingTh = document.createElement('th');
+    racingTh.className = 'racing-col';
+    racingTh.title = isRacingTable ? 'Click checkbox to mark as Not Racing' : 'Click checkbox to mark as Racing';
+    racingTh.textContent = '';
+    tr.appendChild(racingTh);
 
     // Team column
     const teamTh = document.createElement('th');
@@ -721,11 +987,25 @@ function handleHeaderClick(colId) {
 /**
  * Build table body
  */
-function buildTableBody(riders, visibleColumns, columnStats) {
+function buildTableBody(riders, visibleColumns, columnStats, isRacingTable = true) {
     const tbody = document.createElement('tbody');
 
     for (const rider of riders) {
         const tr = document.createElement('tr');
+
+        // Racing toggle cell
+        const racingTd = document.createElement('td');
+        racingTd.className = 'racing-cell';
+        const checkbox = document.createElement('input');
+        checkbox.type = 'checkbox';
+        checkbox.className = 'racing-checkbox';
+        checkbox.checked = isRacingTable; // Checked = racing, unchecked = not racing
+        checkbox.title = isRacingTable ? 'Uncheck to mark as Not Racing' : 'Check to mark as Racing';
+        checkbox.addEventListener('change', () => {
+            toggleRiderRacing(rider.id, checkbox.checked);
+        });
+        racingTd.appendChild(checkbox);
+        tr.appendChild(racingTd);
 
         // Team cell
         const teamTd = document.createElement('td');
@@ -769,6 +1049,18 @@ function buildTableBody(riders, visibleColumns, columnStats) {
     }
 
     return tbody;
+}
+
+/**
+ * Toggle rider racing status
+ */
+function toggleRiderRacing(riderId, isRacing) {
+    if (isRacing) {
+        notRacingRiders.delete(riderId);
+    } else {
+        notRacingRiders.add(riderId);
+    }
+    renderComparisonTable();
 }
 
 /**
@@ -977,12 +1269,27 @@ function showRiderModal(rider) {
             </div>
         `;
 
+        // Profile suitability section
+        html += `
+            <div class="details-section">
+                <div class="details-section-title">Profile Suitability</div>
+                <div class="details-grid">
+                    ${formatDetailItem('Flat', athleteData.handicaps_profile_flat, '')}
+                    ${formatDetailItem('Rolling', athleteData.handicaps_profile_rolling, '')}
+                    ${formatDetailItem('Hilly', athleteData.handicaps_profile_hilly, '')}
+                    ${formatDetailItem('Mountain', athleteData.handicaps_profile_mountainous, '')}
+                </div>
+            </div>
+        `;
+
         // Race stats section
+        const adjustedRating = calculateAdjustedRating(athleteData);
         html += `
             <div class="details-section">
                 <div class="details-section-title">Race Stats</div>
                 <div class="details-grid">
                     ${formatDetailItem('Rating', athleteData.race_current_rating, '')}
+                    ${adjustedRating !== null ? formatDetailItem('Adj Rating', adjustedRating, '') : ''}
                     ${formatDetailItem('30d Max', athleteData.race_max30_rating, '')}
                     ${formatDetailItem('Finishes', athleteData.race_finishes, '')}
                     ${formatDetailItem('Wins', athleteData.race_wins, '')}
@@ -1027,6 +1334,300 @@ function formatDetailItem(label, value, suffix) {
             <span class="details-value">${displayValue}</span>
         </div>
     `;
+}
+
+// ============== Radar Chart Functions ==============
+
+/**
+ * Generate a consistent color for a team name
+ */
+function getTeamColor(teamName, alpha = 1) {
+    let hash = 0;
+    for (let i = 0; i < teamName.length; i++) {
+        hash = teamName.charCodeAt(i) + ((hash << 5) - hash);
+    }
+    const h = Math.abs(hash) % 360;
+    return `hsla(${h}, 70%, 50%, ${alpha})`;
+}
+
+/**
+ * Calculate team aggregates (mean, max, min) for radar charts
+ */
+function calculateTeamAggregates(racingRiders) {
+    // Group riders by team (home vs away)
+    const teams = {
+        home: { name: homeTeam?.name || 'Home Team', riders: [] },
+        away: { name: awayTeam?.name || 'Away Team', riders: [] }
+    };
+
+    for (const rider of racingRiders) {
+        if (rider.athleteData) {
+            teams[rider.team].riders.push(rider);
+        }
+    }
+
+    // Data keys to aggregate
+    const dataKeys = [
+        'power_wkg5', 'power_wkg15', 'power_wkg30', 'power_wkg60', 'power_wkg120', 'power_wkg300', 'power_wkg1200',
+        'power_w5', 'power_w15', 'power_w30', 'power_w60', 'power_w120', 'power_w300', 'power_w1200',
+        'phenotype_scores_sprinter', 'phenotype_scores_puncheur', 'phenotype_scores_pursuiter',
+        'phenotype_scores_tt', 'phenotype_scores_climber'
+    ];
+
+    const teamAggregates = [];
+
+    for (const [teamKey, teamData] of Object.entries(teams)) {
+        if (teamData.riders.length === 0) continue;
+
+        const meanData = {};
+        const maxData = {};
+        const minData = {};
+
+        for (const dataKey of dataKeys) {
+            const values = teamData.riders
+                .map(r => r.athleteData[dataKey])
+                .filter(v => v !== undefined && v !== null && v > 0);
+
+            if (values.length > 0) {
+                const sum = values.reduce((a, b) => a + b, 0);
+                meanData[dataKey] = sum / values.length;
+                maxData[dataKey] = Math.max(...values);
+                minData[dataKey] = Math.min(...values);
+            } else {
+                meanData[dataKey] = null;
+                maxData[dataKey] = null;
+                minData[dataKey] = null;
+            }
+        }
+
+        teamAggregates.push({
+            team: teamData.name,
+            teamKey: teamKey,
+            riderCount: teamData.riders.length,
+            mean: meanData,
+            max: maxData,
+            min: minData
+        });
+    }
+
+    return teamAggregates;
+}
+
+/**
+ * Render radar charts for team comparison
+ */
+function renderTeamRadarCharts(teamAggregates) {
+    const container = document.getElementById('radar-chart-container');
+    if (!container || !window.Chart) {
+        console.warn('Chart.js not loaded or container not found');
+        return;
+    }
+
+    // Show container if we have teams with data
+    if (teamAggregates.length === 0) {
+        container.hidden = true;
+        return;
+    }
+    container.hidden = false;
+
+    // Destroy existing charts
+    if (radarChartPowerWkg) {
+        radarChartPowerWkg.destroy();
+        radarChartPowerWkg = null;
+    }
+    if (radarChartPowerWatts) {
+        radarChartPowerWatts.destroy();
+        radarChartPowerWatts = null;
+    }
+    if (radarChartPhenotype) {
+        radarChartPhenotype.destroy();
+        radarChartPhenotype = null;
+    }
+
+    // Power radar chart - W/kg at different durations
+    const powerLabels = ['5s', '15s', '30s', '1m', '2m', '5m', '20m'];
+    const powerWkgKeys = ['power_wkg5', 'power_wkg15', 'power_wkg30', 'power_wkg60', 'power_wkg120', 'power_wkg300', 'power_wkg1200'];
+
+    const powerWkgDatasets = teamAggregates.map(team => ({
+        label: team.team,
+        data: powerWkgKeys.map(key => team.mean[key] || 0),
+        backgroundColor: getTeamColor(team.team, 0.2),
+        borderColor: getTeamColor(team.team, 1),
+        borderWidth: 2,
+        pointBackgroundColor: getTeamColor(team.team, 1),
+        pointBorderColor: '#fff',
+        pointHoverBackgroundColor: '#fff',
+        pointHoverBorderColor: getTeamColor(team.team, 1)
+    }));
+
+    const powerWkgCtx = document.getElementById('radar-chart-power-wkg');
+    if (powerWkgCtx) {
+        radarChartPowerWkg = new Chart(powerWkgCtx, {
+            type: 'radar',
+            data: {
+                labels: powerLabels,
+                datasets: powerWkgDatasets
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: true,
+                plugins: {
+                    title: {
+                        display: true,
+                        text: 'Power Profile (W/kg)',
+                        color: '#fff',
+                        font: { size: 14, weight: 'bold' }
+                    },
+                    legend: {
+                        position: 'bottom',
+                        labels: {
+                            color: '#ccc',
+                            font: { size: 10 },
+                            boxWidth: 12
+                        }
+                    }
+                },
+                scales: {
+                    r: {
+                        angleLines: { color: '#444' },
+                        grid: { color: '#444' },
+                        pointLabels: { color: '#ccc', font: { size: 11 } },
+                        ticks: {
+                            color: '#888',
+                            backdropColor: 'transparent',
+                            font: { size: 9 }
+                        },
+                        suggestedMin: 0
+                    }
+                }
+            }
+        });
+    }
+
+    // Power radar chart - Watts at different durations
+    const powerWattsKeys = ['power_w5', 'power_w15', 'power_w30', 'power_w60', 'power_w120', 'power_w300', 'power_w1200'];
+
+    const powerWattsDatasets = teamAggregates.map(team => ({
+        label: team.team,
+        data: powerWattsKeys.map(key => team.mean[key] || 0),
+        backgroundColor: getTeamColor(team.team, 0.2),
+        borderColor: getTeamColor(team.team, 1),
+        borderWidth: 2,
+        pointBackgroundColor: getTeamColor(team.team, 1),
+        pointBorderColor: '#fff',
+        pointHoverBackgroundColor: '#fff',
+        pointHoverBorderColor: getTeamColor(team.team, 1)
+    }));
+
+    const powerWattsCtx = document.getElementById('radar-chart-power-watts');
+    if (powerWattsCtx) {
+        radarChartPowerWatts = new Chart(powerWattsCtx, {
+            type: 'radar',
+            data: {
+                labels: powerLabels,
+                datasets: powerWattsDatasets
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: true,
+                plugins: {
+                    title: {
+                        display: true,
+                        text: 'Power Profile (Watts)',
+                        color: '#fff',
+                        font: { size: 14, weight: 'bold' }
+                    },
+                    legend: {
+                        position: 'bottom',
+                        labels: {
+                            color: '#ccc',
+                            font: { size: 10 },
+                            boxWidth: 12
+                        }
+                    }
+                },
+                scales: {
+                    r: {
+                        angleLines: { color: '#444' },
+                        grid: { color: '#444' },
+                        pointLabels: { color: '#ccc', font: { size: 11 } },
+                        ticks: {
+                            color: '#888',
+                            backdropColor: 'transparent',
+                            font: { size: 9 }
+                        },
+                        suggestedMin: 0
+                    }
+                }
+            }
+        });
+    }
+
+    // Phenotype radar chart
+    const phenoLabels = ['Sprinter', 'Puncheur', 'Pursuiter', 'TT', 'Climber'];
+    const phenoKeys = [
+        'phenotype_scores_sprinter',
+        'phenotype_scores_puncheur',
+        'phenotype_scores_pursuiter',
+        'phenotype_scores_tt',
+        'phenotype_scores_climber'
+    ];
+
+    const phenoDatasets = teamAggregates.map(team => ({
+        label: team.team,
+        data: phenoKeys.map(key => team.mean[key] || 0),
+        backgroundColor: getTeamColor(team.team, 0.2),
+        borderColor: getTeamColor(team.team, 1),
+        borderWidth: 2,
+        pointBackgroundColor: getTeamColor(team.team, 1),
+        pointBorderColor: '#fff',
+        pointHoverBackgroundColor: '#fff',
+        pointHoverBorderColor: getTeamColor(team.team, 1)
+    }));
+
+    const phenoCtx = document.getElementById('radar-chart-phenotype');
+    if (phenoCtx) {
+        radarChartPhenotype = new Chart(phenoCtx, {
+            type: 'radar',
+            data: {
+                labels: phenoLabels,
+                datasets: phenoDatasets
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: true,
+                plugins: {
+                    title: {
+                        display: true,
+                        text: 'Phenotype Profile',
+                        color: '#fff',
+                        font: { size: 14, weight: 'bold' }
+                    },
+                    legend: {
+                        position: 'bottom',
+                        labels: {
+                            color: '#ccc',
+                            font: { size: 10 },
+                            boxWidth: 12
+                        }
+                    }
+                },
+                scales: {
+                    r: {
+                        angleLines: { color: '#444' },
+                        grid: { color: '#444' },
+                        pointLabels: { color: '#ccc', font: { size: 11 } },
+                        ticks: {
+                            color: '#888',
+                            backdropColor: 'transparent',
+                            font: { size: 9 }
+                        },
+                        suggestedMin: 0
+                    }
+                }
+            }
+        });
+    }
 }
 
 // ============== Settings Page Functions ==============

@@ -10,9 +10,10 @@
     <div id="titlebar">
         <header>
             <div class="logo"><img src="/pages/images/icon128.png"/></div>
-            <div class="title">Club Ladder</div>
+            <div class="title">GOTTA.BIKE Club Ladder</div>
             <div class="filler"></div>
             <div class="buttons">
+                <div id="share-btn" class="button" title="Copy image to clipboard"><ms>share</ms></div>
                 <a class="button open-settings" href="club-ladder-settings.html?width=700&height=600&child-window"
                    title="Open settings window" target="club-ladder-settings"><ms>settings</ms></a>
                 <div title="Close this window" class="button close electron-only"><ms>close</ms></div>
@@ -21,7 +22,7 @@
     </div>
 
     <div id="content">
-        <div class="team-inputs">
+        <div class="team-inputs" data-exclude-capture>
             <div class="team-input-section" id="home-team-section">
                 <h3><span class="team-badge home">HOME</span> Team</h3>
                 <textarea id="home-team-json" placeholder="Paste team JSON here..."></textarea>
@@ -57,9 +58,15 @@
             </div>
         </div>
 
-        <div class="action-row" id="import-section" hidden>
+        <div class="action-row" id="import-section" hidden data-exclude-capture>
             <button type="button" id="import-btn">Import GOTTA.BIKE Data</button>
             <span id="import-status"></span>
+            <div class="route-selector">
+                <label for="route-profile-select">Route:</label>
+                <select id="route-profile-select">
+                    <!-- Populated by JavaScript -->
+                </select>
+            </div>
         </div>
 
         <div id="loading" hidden>
@@ -76,6 +83,21 @@
         <div id="no-data" class="no-data" hidden>
             <p>No team data loaded.</p>
             <p>Paste team JSON above and click "Load Team" to get started.</p>
+        </div>
+
+        <div id="radar-chart-container" hidden>
+            <div class="radar-chart-divider"><span>Team Comparison Charts</span></div>
+            <div class="radar-charts-wrapper">
+                <div class="radar-chart-box">
+                    <canvas id="radar-chart-power-wkg"></canvas>
+                </div>
+                <div class="radar-chart-box">
+                    <canvas id="radar-chart-power-watts"></canvas>
+                </div>
+                <div class="radar-chart-box">
+                    <canvas id="radar-chart-phenotype"></canvas>
+                </div>
+            </div>
         </div>
 
         <!-- Tooltip -->
@@ -97,6 +119,8 @@
         </div>
     </div>
 
+    <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
     <script type="module">
         import {clubLadderMain} from './src/club-ladder.mjs';
         clubLadderMain();
