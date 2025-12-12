@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
     <meta name="apple-mobile-web-app-capable" content="yes"/>
 
-    <title>Club Ladder Settings</title>
+    <title>GOTTA.BIKE Club Ladder Settings</title>
 
     <link id="favicon" rel="shortcut icon" href="/pages/images/favicon.png"/>
     <link rel="stylesheet" href="/pages/css/common.css"/>
@@ -15,7 +15,7 @@
     <div id="titlebar">
         <header>
             <div class="logo"><img src="/pages/images/icon128.png"/></div>
-            <div class="title">Club Ladder Settings</div>
+            <div class="title">GOTTA.BIKE Club Ladder Settings</div>
             <div class="filler"></div>
             <div class="buttons">
                 <div title="Close this window" class="button close electron-only"><ms>close</ms></div>
@@ -126,9 +126,9 @@
                         Download and install the Chrome extension to export team rosters from ladder.cycleracing.club.
                         After downloading, unzip the file and load it as an unpacked extension in Chrome.
                     </p>
-                    <a href="./chrome_extension/GOTTA_BIKE_ladder_1.1.0.zip" download class="download-btn">
+                    <a href="./chrome_extension/GOTTA_BIKE_ladder_1.3.0.zip" download class="download-btn">
                         <ms>download</ms>
-                        Download Extension (v1.1.0)
+                        Download Extension (v1.3.0)
                     </a>
                 </div>
 
@@ -140,9 +140,17 @@
                         <li>Open Chrome and go to <code style="background: #333; padding: 2px 6px; border-radius: 3px;">chrome://extensions</code></li>
                         <li>Enable "Developer mode" (toggle in top right)</li>
                         <li>Click "Load unpacked" and select the extracted folder</li>
-                        <li>Navigate to a team page on ladder.cycleracing.club</li>
-                        <li>Click the extension icon to copy team JSON</li>
-                        <li>Paste the JSON into the Club Ladder window</li>
+                    </ol>
+                </div>
+
+                <div style="margin-top: 1.5em;">
+                    <h3>Usage Instructions</h3>
+                    <ol style="color: #aaa; font-size: 0.9em; line-height: 1.6;">
+                        <li>Visit a team page on the ladder site, the URL will look like:<br>
+                            <code style="background: #333; padding: 2px 6px; border-radius: 3px;">https://ladder.cycleracing.club/rider/team/n/389</code></li>
+                        <li>Click the extension icon &rarr; Capture Data &rarr; Copy JSON</li>
+                        <li>Paste the JSON data into the Home or Away team textarea</li>
+                        <li>Click "Load Home Team" or "Load Away Team" to read the pasted data</li>
                     </ol>
                 </div>
             </section>
