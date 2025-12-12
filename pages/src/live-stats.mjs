@@ -612,9 +612,12 @@ function sortRiders(riders, sortMode) {
 }
 
 function renderRiders() {
-    if (!nearbyData || !nearbyData.length) return;
-
     const settings = common.settingsStore.get();
+
+    // Always update headers so column changes appear immediately
+    updateTableHeaders(settings);
+
+    if (!nearbyData || !nearbyData.length) return;
     const tbody = document.getElementById('rider-table');
     tbody.innerHTML = '';
 
@@ -691,7 +694,7 @@ function renderRiders() {
 
         // Get enabled power columns
         const enabledPowerColumns = POWER_COLUMNS.filter(col =>
-            settings[`show${col.key.charAt(0).toUpperCase() + col.key.slice(1)}`]
+            settings[`showPower${col.seconds}s`]
         );
 
         // Collect power values for all durations and update max
@@ -789,9 +792,6 @@ function renderRiders() {
         }
         tbody.appendChild(row);
     }
-
-    // Update table headers based on enabled columns
-    updateTableHeaders(settings);
 }
 
 function updateTableHeaders(settings) {
@@ -800,7 +800,7 @@ function updateTableHeaders(settings) {
 
     // Get enabled power columns
     const enabledPowerColumns = POWER_COLUMNS.filter(col =>
-        settings[`show${col.key.charAt(0).toUpperCase() + col.key.slice(1)}`]
+        settings[`showPower${col.seconds}s`]
     );
 
     // Get enabled draft columns
@@ -843,8 +843,6 @@ export async function settingsMain() {
     // Resize window to fit content
     window.resizeTo(850, 600);
 
-    loadStoredMaxHRData();
-    loadStoredMaxPowerData();
     loadStoredAthleteData();
     setupBackgroundOptionToggle();
     setupTabNavigation();
