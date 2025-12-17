@@ -4,7 +4,7 @@
     "description": "Display nearby riders with heart rate color-coded by HR zone",
     "author": "Vincent Davis",
     "website_url": "https://gotta.bike",
-    "version": "3.0.1",
+    "version": "2025.12.17.2",
     "content_js": [],
     "content_css": [],
     "web_root": "pages",

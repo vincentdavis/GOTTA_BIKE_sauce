@@ -303,6 +303,17 @@ export async function clubLadderSettingsMain() {
 
     // Populate sort column select
     populateSortColumnSelect();
+
+    // Setup external links to open in system browser
+    document.querySelectorAll('.external-link').forEach(link => {
+        link.addEventListener('click', (e) => {
+            e.preventDefault();
+            const url = link.dataset.url;
+            if (url && common.rpc?.openExternalLink) {
+                common.rpc.openExternalLink(url);
+            }
+        });
+    });
 }
 
 /**

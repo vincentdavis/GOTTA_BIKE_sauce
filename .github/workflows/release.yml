@@ -1,9 +1,12 @@
 name: Release
 
 on:
-  push:
-    tags:
-      - 'v*.*.*'
+  workflow_dispatch:
+    inputs:
+      release_notes:
+        description: 'Additional release notes (optional)'
+        required: false
+        type: string
 
 jobs:
   release:
@@ -13,10 +16,47 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
-      - name: Extract version from tag
+      - name: Generate version
         id: version
-        run: echo "VERSION=${GITHUB_REF_NAME#v}" >> $GITHUB_OUTPUT
+        run: |
+          TODAY=$(date -u +%Y.%-m.%-d)
+
+          # Get the latest tag for today if it exists
+          LATEST_TAG=$(git tag -l "v${TODAY}.*" | sort -V | tail -n1)
+
+          if [ -n "$LATEST_TAG" ]; then
+            # Extract count from latest tag and increment
+            CURRENT_COUNT=$(echo "$LATEST_TAG" | cut -d'.' -f4)
+            NEW_COUNT=$((CURRENT_COUNT + 1))
+          else
+            NEW_COUNT=1
+          fi
+
+          VERSION="${TODAY}.${NEW_COUNT}"
+          echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
+          echo "Generated version: $VERSION"
+
+      - name: Update manifest.json
+        run: |
+          # Update version in manifest.json
+          sed -i 's/"version": "[^"]*"/"version": "${{ steps.version.outputs.VERSION }}"/' manifest.json
+          echo "Updated manifest.json to version ${{ steps.version.outputs.VERSION }}"
+
+      - name: Commit version update
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add manifest.json
+          git commit -m "Release v${{ steps.version.outputs.VERSION }}"
+          git push
+
+      - name: Create and push tag
+        run: |
+          git tag "v${{ steps.version.outputs.VERSION }}"
+          git push origin "v${{ steps.version.outputs.VERSION }}"
 
       - name: Create release ZIP
         run: |
@@ -29,5 +69,8 @@ jobs:
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: v${{ steps.version.outputs.VERSION }}
+          name: v${{ steps.version.outputs.VERSION }}
           files: dist/GOTTA_BIKE_sauce_${{ steps.version.outputs.VERSION }}.zip
           generate_release_notes: true
+          body: ${{ inputs.release_notes }}

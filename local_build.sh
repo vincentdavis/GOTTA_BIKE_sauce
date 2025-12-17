@@ -1,25 +1,35 @@
 #!/bin/bash
 
 # Build script for GOTTA.BIKE sauce mod
-# 1. Increments minor version (e.g., 1.0.0 -> 1.1.0)
-# 2. Copies required files to build folder
-# 3. Creates zip file for distribution
+# Uses date-based versioning: year.month.day.count
+# - Automatically increments count if same day
+# - Copies required files to build folder
+# - Creates zip file for distribution
 
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
 
-# Read current version from manifest.json
+# Generate date-based version (year.month.day.count)
+TODAY=$(date +%Y.%-m.%-d)
 CURRENT_VERSION=$(grep -o '"version": "[^"]*"' manifest.json | cut -d'"' -f4)
+
+# Extract date part and count from current version
+CURRENT_DATE_PART=$(echo "$CURRENT_VERSION" | cut -d'.' -f1-3)
+CURRENT_COUNT=$(echo "$CURRENT_VERSION" | cut -d'.' -f4)
+
+# Determine new version
+if [ "$CURRENT_DATE_PART" = "$TODAY" ]; then
+    # Same day, increment count
+    NEW_COUNT=$((CURRENT_COUNT + 1))
+    NEW_VERSION="${TODAY}.${NEW_COUNT}"
+else
+    # New day, reset count to 1
+    NEW_VERSION="${TODAY}.1"
+fi
+
 echo "Current version: $CURRENT_VERSION"
-
-# Parse version parts
-IFS='.' read -r MAJOR MINOR PATCH <<< "$CURRENT_VERSION"
-
-# Increment minor version
-NEW_MINOR=$((MINOR + 1))
-NEW_VERSION="$MAJOR.$NEW_MINOR.$PATCH"
 echo "New version: $NEW_VERSION"
 
 # Update version in manifest.json
@@ -33,7 +43,7 @@ OUTPUT_DIR="$BUILD_DIR/$FOLDER_NAME"
 
 # Clean up previous build if exists
 rm -rf "$OUTPUT_DIR"
-rm -f "$BUILD_DIR/${FOLDER_NAME}_${NEW_VERSION}.zip"
+rm -f "$BUILD_DIR/${FOLDER_NAME}_"*.zip
 
 # Create output directory
 mkdir -p "$OUTPUT_DIR"
@@ -43,8 +53,7 @@ cp manifest.json "$OUTPUT_DIR/"
 cp -r pages "$OUTPUT_DIR/"
 
 # Remove unnecessary files from the copy
-rm -f "$OUTPUT_DIR/pages/.DS_Store"
-rm -rf "$OUTPUT_DIR/pages/**/.DS_Store"
+find "$OUTPUT_DIR" -name '.DS_Store' -delete
 
 echo "Copied files to $OUTPUT_DIR"
 
@@ -53,10 +62,11 @@ cd "$BUILD_DIR"
 zip -r "${FOLDER_NAME}_${NEW_VERSION}.zip" "$FOLDER_NAME"
 cd "$SCRIPT_DIR"
 
-#Copy mod to user mod folder
+# Copy mod to user mod folder
 cp -r "$OUTPUT_DIR" ~/Documents/SauceMods/
 
 echo ""
 echo "Build complete!"
+echo "  Version: $NEW_VERSION"
 echo "  Folder: $OUTPUT_DIR"
 echo "  Zip: $BUILD_DIR/${FOLDER_NAME}_${NEW_VERSION}.zip"
