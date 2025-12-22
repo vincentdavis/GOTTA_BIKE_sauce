@@ -742,6 +742,10 @@ function setupImportButton() {
                     if (results.failed > 0) {
                         message += `, ${results.failed} not found`;
                     }
+                    // Show remaining daily quota if available
+                    if (results.dailyRemaining !== undefined) {
+                        message += ` (${results.dailyRemaining} quota remaining today)`;
+                    }
                     setImportStatus('success', message);
                     try {
                         renderHeatmap();
@@ -1191,15 +1195,31 @@ async function bulkImportFromGotta(athleteIds, progressCallback) {
             });
             console.log('[PreRace] API response status:', response.status);
 
+            const data = await response.json();
+
             if (!response.ok) {
                 if (response.status === 401) {
                     throw new Error('Authentication expired. Please re-authenticate in PreRace Settings.');
                 }
+                if (response.status === 429) {
+                    // Rate limit exceeded - include quota info in error
+                    const remaining = data.daily_remaining ?? 0;
+                    const limit = data.daily_limit ?? 100;
+                    const requested = data.requested ?? batch.length;
+                    console.warn('[PreRace] Rate limit exceeded:', data);
+                    throw new Error(`Daily limit exceeded. Requested ${requested} riders but only ${remaining} of ${limit} remaining today. Try again tomorrow or reduce batch size.`);
+                }
                 throw new Error(`API error: ${response.status}`);
             }
 
-            const data = await response.json();
             console.log('[PreRace] API returned', data.riders?.length || 0, 'riders');
+
+            // Log remaining quota if provided
+            if (data.daily_remaining !== undefined) {
+                console.log(`[PreRace] Daily quota remaining: ${data.daily_remaining}`);
+                // Store remaining quota for display
+                results.dailyRemaining = data.daily_remaining;
+            }
 
             if (data.riders && Array.isArray(data.riders)) {
                 for (const rider of data.riders) {
@@ -2599,7 +2619,16 @@ function setupGottaAthleteLookup() {
 
             if (response.ok && data) {
                 displayGottaAthleteData(athleteId, data);
-                setGottaLookupStatus('success', 'Data retrieved successfully');
+                // Show remaining quota if available
+                const quotaInfo = data.daily_remaining !== undefined
+                    ? ` (${data.daily_remaining} quota remaining today)`
+                    : '';
+                setGottaLookupStatus('success', `Data retrieved successfully${quotaInfo}`);
+            } else if (response.status === 429) {
+                // Rate limit exceeded - show detailed message
+                const remaining = data.daily_remaining ?? 0;
+                const limit = data.daily_limit ?? 100;
+                setGottaLookupStatus('error', `Daily limit exceeded. ${remaining} of ${limit} remaining. Try again tomorrow.`);
             } else {
                 setGottaLookupStatus('error', data.message || data.error || 'Failed to fetch athlete data');
             }
